@@ -1,0 +1,333 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_base.yml
+# Converted from recipes/relativity_base.rb (+ runtime attributes from
+# attributes/relativity_base.rb that Chef computed with powershell_out!).
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Runtime facts that were computed in attributes/relativity_base.rb via
+# powershell_out! at compile time. Ansible resolves them here at run time.
+# ---------------------------------------------------------------------------
+- name: Get total physical memory (MB)
+  ansible.windows.win_powershell:
+    script: '(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum / 1mb'
+  register: rel_totalmem
+
+- name: Resolve service-user profile SID
+  ansible.windows.win_powershell:
+    script: >-
+      (Get-WmiObject win32_userprofile |
+       Where-Object { $_.LocalPath -match "{{ scalr.variables.Service_User }}" }).SID
+  register: rel_serviceuser_sid
+  changed_when: false
+
+- name: Compute pagefile / service-user facts
+  ansible.builtin.set_fact:
+    pagefile_os: "{{ pagefile.os }}"
+    # max = totalmem * 1.5  (rounded to int)
+    pagefile_max: "{{ (rel_totalmem.output[0] | float * 1.5) | round | int }}"
+    serviceuser_sid: "{{ rel_serviceuser_sid.output[0] | default('') }}"
+
+- name: Compute additional pagefile size (cap at 51200)
+  ansible.builtin.set_fact:
+    pagefile_add: "{{ [pagefile_max | int, 51200] | min }}"
+
+- name: Build service-user registry key paths (need the resolved SID)
+  ansible.builtin.set_fact:
+    visualeffects_keypath: "HKU\\{{ serviceuser_sid }}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects"
+    proxysettings_keypath: "HKU\\{{ serviceuser_sid }}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Internet Settings"
+    serviceuser_hive_present: "{{ serviceuser_sid | length > 0 }}"
+
+# ---------------------------------------------------------------------------
+# include_recipe 'uxs_7zip::default' / 'uxs_notepadplusplus::default'
+# (dependency cookbooks -- install the equivalent packages here)
+# ---------------------------------------------------------------------------
+- name: Install 7-Zip (was uxs_7zip::default)
+  ansible.windows.win_package:
+    path: "{{ software.basesource }}/7zip/7z-x64.msi"
+    state: present
+    arguments: /qn /norestart
+  ignore_errors: true   # dependency cookbook -- adjust to your package source
+
+- name: Install Notepad++ (was uxs_notepadplusplus::default)
+  ansible.windows.win_package:
+    path: "{{ software.basesource }}/notepadplusplus/npp-installer.x64.exe"
+    state: present
+    arguments: /S
+  ignore_errors: true   # dependency cookbook -- adjust to your package source
+
+# ---------------------------------------------------------------------------
+# Import Carbon PowerShell module
+# ---------------------------------------------------------------------------
+- name: Check if Carbon module directory exists
+  ansible.windows.win_stat:
+    path: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon'
+  register: carbon_dir
+
+- name: Download Carbon.zip
+  ansible.windows.win_get_url:
+    url: "{{ software.basesource }}/PSModules/Carbon.zip"
+    dest: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon.zip'
+  when: not carbon_dir.stat.exists
+
+- name: Extract Carbon module
+  community.windows.win_unzip:
+    src: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon.zip'
+    dest: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon'
+    creates: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon'
+  when: not carbon_dir.stat.exists
+
+# ---------------------------------------------------------------------------
+# Create Base Directories
+# ---------------------------------------------------------------------------
+- name: Create base directories
+  ansible.windows.win_file:
+    path: "{{ item }}"
+    state: directory
+  loop:
+    - "{{ directory.logsfolder }}"
+    - "{{ directory.rel_installers_folder }}"
+    - "{{ directory.reltempfolder }}"
+    - "{{ directory.tempfolder }}"
+    - "{{ directory.certs }}"
+    - "{{ directory.scripts }}"
+
+# ---------------------------------------------------------------------------
+# Base Optimization
+# ---------------------------------------------------------------------------
+- name: Set Active Power Scheme
+  ansible.windows.win_regedit:
+    path: "{{ registry.powerscheme.keypath }}"
+    name: "{{ registry.powerscheme.value }}"
+    data: "{{ registry.powerscheme.data }}"
+    type: string
+
+- name: Set Visual Effects (service user hive)
+  ansible.windows.win_regedit:
+    path: "{{ visualeffects_keypath }}"
+    name: "{{ registry.visualeffects.value }}"
+    data: "{{ registry.visualeffects.data }}"
+    type: dword
+  when: serviceuser_hive_present
+  ignore_errors: true
+
+- name: Set Processor Scheduling
+  ansible.windows.win_regedit:
+    path: "{{ registry.procsheduling.keypath }}"
+    name: "{{ registry.procsheduling.value }}"
+    data: "{{ registry.procsheduling.data }}"
+    type: dword
+
+- name: Set OS Pagefile
+  community.windows.win_pagefile:
+    drive: 'C'
+    initial_size: "{{ pagefile_os }}"
+    maximum_size: "{{ pagefile_os }}"
+    override: true
+    state: present
+  when: scalr.variables.Function != 'SQL'
+
+# ---------------------------------------------------------------------------
+# Install Base Software -- .NET 3.5
+# ---------------------------------------------------------------------------
+- name: Check for extracted netfx directory
+  ansible.windows.win_stat:
+    path: "{{ software.netfx.installer.destination }}\\netfx"
+  register: netfx_dir
+
+- name: Download netfx.zip (.NET 3.5 sources)
+  ansible.windows.win_get_url:
+    url: "{{ software.netfx.installer.source }}/{{ software.netfx.installer.zip }}"
+    dest: "{{ software.netfx.installer.destination }}\\{{ software.netfx.installer.zip }}"
+  when: not netfx_dir.stat.exists
+
+- name: Extract netfx.zip
+  community.windows.win_unzip:
+    src: "{{ software.netfx.installer.destination }}\\{{ software.netfx.installer.zip }}"
+    dest: "{{ software.netfx.installer.destination }}\\netfx"
+    creates: "{{ software.netfx.installer.destination }}\\netfx"
+  when: not netfx_dir.stat.exists
+
+- name: Evaluate .NET 3.5 install guard
+  ansible.windows.win_powershell:
+    script: "if ({{ software.netfx.installer.guard }}) { $Ansible.Result = $true } else { $Ansible.Result = $false }"
+  register: netfx_guard
+  changed_when: false
+
+- name: Install .NET 3.5 (NetFx3 optional feature)
+  ansible.windows.win_shell: >-
+    Enable-WindowsOptionalFeature -Online -FeatureName NetFx3
+    -Source "{{ software.netfx.installer.destination }}\\netfx" -LimitAccess -All
+  when: not (netfx_guard.result | bool)
+
+- name: Delete netfx.zip after install
+  ansible.windows.win_file:
+    path: "{{ software.netfx.installer.destination }}\\{{ software.netfx.installer.zip }}"
+    state: absent
+
+# ---------------------------------------------------------------------------
+# Install .NET 4.7.2
+# ---------------------------------------------------------------------------
+- name: Evaluate .NET 4.7.2 install guard
+  ansible.windows.win_powershell:
+    script: "if ({{ software.net472.installer.guard }}) { $Ansible.Result = $true } else { $Ansible.Result = $false }"
+  register: net472_guard
+  changed_when: false
+
+- name: Install .NET 4.7.2
+  ansible.windows.win_package:
+    path: "{{ software.net472.installer.source }}/{{ software.net472.installer.bits }}"
+    arguments: "{{ software.net472.installer.options }}"
+    state: present
+  when: not (net472_guard.result | bool)
+
+# ---------------------------------------------------------------------------
+# Install Visual C++ Redistributables (2010/2012/2013/2015 -- x86 & x64)
+# Driven by a loop over the mvc software definitions to keep it DRY.
+# ---------------------------------------------------------------------------
+- name: Install Microsoft Visual C++ Redistributables
+  include_tasks: _install_guarded_package.yml
+  loop:
+    - "{{ software.mvc2010.x86.installer }}"
+    - "{{ software.mvc2010.x64.installer }}"
+    - "{{ software.mvc2012.x86.installer }}"
+    - "{{ software.mvc2012.x64.installer }}"
+    - "{{ software.mvc2013.x86.installer }}"
+    - "{{ software.mvc2013.x64.installer }}"
+    - "{{ software.mvc2015.x86.installer }}"
+    - "{{ software.mvc2015.x64.installer }}"
+  loop_control:
+    loop_var: pkg
+
+# ---------------------------------------------------------------------------
+# Install Microsoft Edge
+# ---------------------------------------------------------------------------
+- name: Install Microsoft Edge
+  ansible.windows.win_package:
+    path: "{{ software.msedge.installer.source }}/{{ software.msedge.installer.bits }}"
+    arguments: "{{ software.msedge.installer.options }}"
+    state: present
+  register: msedge_install
+  failed_when: msedge_install.rc is defined and msedge_install.rc not in [0, 1603, 1618]
+
+# ---------------------------------------------------------------------------
+# Relativity Base Prerequisites
+# ---------------------------------------------------------------------------
+- name: Add service account to local Administrators group
+  ansible.windows.win_group_membership:
+    name: Administrators
+    members:
+      - "{{ scalr.variables.Domain }}\\{{ scalr.variables.Service_User }}"
+    state: present
+
+- name: Grant service account "Log on as a Service" right
+  ansible.windows.win_shell: >-
+    Grant-CPrivilege -Identity "{{ scalr.variables.Domain }}\\{{ scalr.variables.Service_User }}"
+    -Privilege SeServiceLogonRight
+
+- name: Enable RDP (fDenyTSConnections = 0)
+  ansible.windows.win_regedit:
+    path: 'HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server'
+    name: 'fDenyTSConnections'
+    data: 0
+    type: dword
+
+- name: Enable Microsoft DTC (exclude SST)
+  ansible.windows.win_regedit:
+    path: "{{ registry.mstdc.keypath }}"
+    name: "{{ item.name }}"
+    data: "{{ item.data }}"
+    type: dword
+  loop: "{{ registry.mstdc.values }}"
+  when: scalr.variables.Function != 'SST'
+
+- name: Disable Proxy Settings (service user hive)
+  ansible.windows.win_regedit:
+    path: "{{ proxysettings_keypath }}"
+    name: "{{ registry.proxysettings.value }}"
+    data: "{{ registry.proxysettings.data }}"
+    type: dword
+  when: serviceuser_hive_present
+  ignore_errors: true
+
+- name: Grant service account Full Control on ProgramData
+  ansible.windows.win_acl:
+    path: "{{ acl.programdata }}"
+    user: "{{ scalr.variables.Domain }}\\{{ scalr.variables.Service_User }}"
+    rights: FullControl
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+
+- name: Grant service account Full Control on Package Cache
+  ansible.windows.win_acl:
+    path: "{{ acl.packagecache }}"
+    user: "{{ scalr.variables.Domain }}\\{{ scalr.variables.Service_User }}"
+    rights: FullControl
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+
+- name: Check Appdata Temp folder exists
+  ansible.windows.win_stat:
+    path: "{{ acl.appdata.temp }}"
+  register: appdata_temp
+
+- name: Grant service account Full Control on Appdata Temp
+  ansible.windows.win_acl:
+    path: "{{ acl.appdata.temp }}"
+    user: "{{ scalr.variables.Domain }}\\{{ scalr.variables.Service_User }}"
+    rights: FullControl
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+  when: appdata_temp.stat.exists
+
+- name: Check Appdata Packages folder exists
+  ansible.windows.win_stat:
+    path: "{{ acl.appdata.packages }}"
+  register: appdata_packages
+
+- name: Grant service account Full Control on Appdata Packages
+  ansible.windows.win_acl:
+    path: "{{ acl.appdata.packages }}"
+    user: "{{ scalr.variables.Domain }}\\{{ scalr.variables.Service_User }}"
+    rights: FullControl
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+  when: appdata_packages.stat.exists
+
+- name: Disable IE Enhanced Security Configuration
+  ansible.windows.win_regedit:
+    path: 'HKLM\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}'
+    name: 'IsInstalled'
+    data: 0
+    type: dword
+
+- name: Set default user registry settings (Hidden / HideFileExt)
+  ansible.windows.win_shell: |
+    reg load HKLM\DefaultUser C:\Users\Default\NTUSER.DAT
+    New-ItemProperty -Path "HKLM:\Defaultuser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "Hidden" -Value "1" -PropertyType DWord
+    New-ItemProperty -Path "HKLM:\Defaultuser\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "HideFileExt" -Value "0" -PropertyType DWord
+    reg unload HKLM\DefaultUser
+  ignore_errors: true
+
+# ---------------------------------------------------------------------------
+# Base firewall rules (3389, 6870, 9090, 10000)
+# ---------------------------------------------------------------------------
+- name: Allow base inbound TCP ports
+  community.windows.win_firewall_rule:
+    name: "{{ item }}-Inbound"
+    localport: "{{ item }}"
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  loop:
+    - '3389'
+    - '6870'
+    - '9090'
+    - '10000'

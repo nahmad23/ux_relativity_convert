@@ -1,0 +1,15 @@
+param(
+[switch] $ForceReRegistration,
+[switch] $Confirm
+)
+
+if ($ForceReRegistration) {
+    ./secretstore.exe register --url=https://{{ scalr.variables.SecretStore_URL }}:{{ network.secretstore.service.port }} --tlsCert={{ scalr.variables.SecretStore_Thumbprint }} --yes
+}
+else {
+    ./secretstore.exe register --url=https://{{ scalr.variables.SecretStore_URL }}:{{ network.secretstore.service.port }} --tlsCert={{ scalr.variables.SecretStore_Thumbprint }}
+}
+
+if (!$Confirm) {
+    Pause
+}

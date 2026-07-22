@@ -1,0 +1,67 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_sql.yml
+# Converted from recipes/relativity_sql.rb (Function SQL)
+# =============================================================================
+
+# ----- Disk init (local/kitchen only): Data + Log + TempDB -----
+- name: Initialise Data / Log / TempDB disks (local/kitchen only)
+  ansible.builtin.include_tasks: _disk_init.yml
+  loop:
+    - { letter: "{{ scalr.variables.Data_DriveLetter }}", label: "{{ scalr.variables.Data_DriveLabel }}" }
+    - { letter: "{{ scalr.variables.Log_DriveLetter }}", label: "{{ scalr.variables.Log_DriveLabel }}" }
+    - { letter: "{{ scalr.variables.Temp_DriveLetter }}", label: "{{ scalr.variables.Temp_DriveLabel }}" }
+  loop_control:
+    loop_var: disk
+  when: policy_group == 'local'
+
+# ----- Install Failover Cluster roles -----
+- name: Install Failover Cluster roles/features
+  ansible.windows.win_feature:
+    name: "{{ sql.features }}"
+    state: present
+
+# ----- Enable Named Pipes -----
+- name: Check SQL instance registry present
+  ansible.windows.win_powershell:
+    script: >-
+      if ((Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQLServer" -ErrorAction SilentlyContinue) -eq $null)
+      { $Ansible.Result = $false } else { $Ansible.Result = $true }
+  register: sql_instance_present
+  changed_when: false
+
+- name: Enable Named Pipes protocol
+  ansible.windows.win_regedit:
+    path: 'HKLM\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQLServer\SuperSocketNetLib\Np'
+    name: 'Enabled'
+    data: 1
+    type: dword
+  when: sql_instance_present.result | bool
+
+# ----- SQL firewall rules -----
+- name: Allow SQL inbound TCP ports
+  community.windows.win_firewall_rule:
+    name: "{{ item }}-Inbound"
+    localport: "{{ item }}"
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  loop:
+    - '135'
+    - '445'
+    - '1434'
+    - '1433'
+    - '5022'
+    - '6859'
+    - '6860'
+    - '6861'
+    - '6862'
+    - '8092'
+    - '49152-65535'
+
+# ---------------------------------------------------------------------------
+# NOTE: The BCPPath directory + SMB share creation steps were commented out in
+# the source recipe. Re-enable with win_file + win_share if a BCP disk exists.
+# ---------------------------------------------------------------------------

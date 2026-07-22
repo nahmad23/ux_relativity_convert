@@ -1,0 +1,60 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/vars/main.yml
+#
+# Data-driven definitions used by tasks/relativity_harden.yml, plus the
+# uxo_win_harden control overrides that were in attributes/relativity_harden.rb.
+# =============================================================================
+
+# SCHANNEL protocols (recipes/relativity_harden.rb 7.2 - 7.6).
+# Each protocol is applied to both Server and Client sub-keys.
+schannel_protocols:
+  - proto: 'SSL 2.0'
+    enabled: 0
+    disabledbydefault: 1
+    sides: ['Server', 'Client']
+  - proto: 'SSL 3.0'
+    enabled: 0
+    disabledbydefault: 1
+    sides: ['Server', 'Client']
+  - proto: 'TLS 1.0'
+    enabled: 0
+    disabledbydefault: 1
+    sides: ['Server', 'Client']
+  - proto: 'TLS 1.1'
+    enabled: 0
+    disabledbydefault: 1
+    sides: ['Server', 'Client']
+  - proto: 'TLS 1.2'
+    enabled: 1
+    disabledbydefault: 0
+    sides: ['Server', 'Client']
+
+# SCHANNEL cipher suites (recipes/relativity_harden.rb 7.7 - 7.11 + extras).
+schannel_ciphers:
+  - { name: 'NULL', enabled: 0 }
+  - { name: 'DES 56/56', enabled: 0 }
+  - { name: 'RC4 40/128', enabled: 0 }
+  - { name: 'RC4 56/128', enabled: 0 }
+  - { name: 'RC4 64/128', enabled: 0 }
+  - { name: 'RC4 128/128', enabled: 0 }
+  - { name: 'AES 128/128', enabled: 0 }
+  - { name: 'AES 256/256', enabled: 1 }
+  - { name: 'Triple DES 168', enabled: 0 }
+
+# uxo_win_harden control overrides (attributes/relativity_harden.rb).
+# These were consumed by the external uxo_win_harden cookbook. Kept here for
+# reference so the same controls can be toggled if that hardening layer is
+# ported separately.
+uxo_win_harden_overrides:
+  '18.9.80.1.1': false
+  '2.2.9': false          # not working in snsulx
+  '2.3.17.1': false
+  '2.3.17.2': false
+  '2.3.17.3': false
+  '2.3.17.4': false
+  '2.3.17.5': false
+  '2.3.17.6': false
+  '2.3.17.7': false
+  '2.3.17.8': false
+  '2.3.11.4': false

@@ -1,0 +1,28 @@
+---
+# =============================================================================
+# group_vars/rel_msb.yml -- overrides for the Message Broker (RabbitMQ) group.
+# Merges over group_vars/all.yml. Values mirror the kitchen.yml `rel-msb` suite.
+# =============================================================================
+
+policy_group: 'prod'
+
+scalr:
+  variables:
+    Function: 'MSB'
+    SCALR_FARM_ROLE_ALIAS: 'Message-Broker-Server'
+    Domain: 'test-msb'
+    Erlang_MinorVersion: '24.3.4.2'
+    Erlang_MajorVersion: '12.13.2.2'
+    Erlang_SSLVersion: '10.7.3.2'
+    RabbitMQ_Version: '3.9.21'
+    RabbitMQ_Cookie: 'SW*@w1w99WwKE41Bs*yj5G^Z'
+    PRIMARYSQLINSTANCE: 'test-sql.fakedomain.org'
+    DEFAULTFILEREPOSITORY: 'C:\Temp'
+    SERVERFQDN: 'test-rabbit.unitedlex.global'
+
+# Cluster member "ip hostname.domain" lines added to the hosts file.
+# In Chef these came from the Scalr role Ohai data; supply them explicitly here.
+rabbit_hosts:
+  # - '10.0.0.11 AUSSCREL2MSB001.test-msb'
+  # - '10.0.0.12 AUSSCREL2MSB002.test-msb'
+  # - '10.0.0.13 AUSSCREL2MSB003.test-msb'

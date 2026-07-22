@@ -1,0 +1,63 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_datagrid.yml
+# Converted from recipes/relativity_datagrid.rb (Functions ELM / ELD / ELC)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Request certificate from Vault PKI (used for traefik / elasticsearch TLS)
+# (Chef: rel_vault_pki_certificate custom resource; data_bag_item 'secrets/vault')
+# ---------------------------------------------------------------------------
+- name: Build DataGrid PKI certificate options
+  ansible.builtin.set_fact:
+    datagrid_cert_common_name: >-
+      {{ (inventory_hostname_short ~ '.unitedlex.global') if policy_group == 'local'
+         else (inventory_hostname_short ~ '.' ~ scalr.variables.Domain) }}
+    datagrid_pki_options: >-
+      {{
+        {
+          'common_name': ((inventory_hostname_short ~ '.unitedlex.global') if policy_group == 'local' else (inventory_hostname_short ~ '.' ~ scalr.variables.Domain)),
+          'ip_sans': (ansible_ip_addresses | default([ansible_host]) | first),
+          'ttl': ('121h' if policy_group == 'local' else '43800h')
+        }
+      }}
+
+- name: Issue DataGrid TLS certificate from Vault PKI
+  ansible.builtin.include_tasks: _vault_pki_certificate.yml
+  vars:
+    pki_common_name: "{{ datagrid_cert_common_name }}"
+    pki_vault_address: "{{ vault.uxa_relativity_v2.address }}"
+    pki_vault_token: "{{ vault.uxa_relativity_v2.token }}"
+    pki_vault_mount: 'pki_int'
+    pki_vault_role: 'unitedlex-global'
+    pki_options: "{{ datagrid_pki_options }}"
+    pki_cert_path: "{{ directory.certs }}\\cert.pem"
+    pki_cert_chain_path: "{{ directory.certs }}\\cert_chain.pem"
+    pki_cert_fullchain_path: "{{ directory.certs }}\\cert_fullchain.pem"
+    pki_cert_key_path: "{{ directory.certs }}\\cert.key"
+    pki_expiring_days: 5
+
+# ---------------------------------------------------------------------------
+# Disk init (local/kitchen only) + additional pagefile
+# ---------------------------------------------------------------------------
+- name: Initialise pagefile disk (local/kitchen only)
+  ansible.builtin.include_tasks: _disk_init.yml
+  loop:
+    - { letter: "{{ pagefile.driveletter }}", label: "{{ pagefile.drivelabel }}" }
+  loop_control:
+    loop_var: disk
+  when: policy_group == 'local'
+
+- name: Check pagefile drive is present
+  ansible.windows.win_stat:
+    path: "{{ pagefile.driveletter }}:\\"
+  register: pagefile_drive
+
+- name: Set additional pagefile
+  community.windows.win_pagefile:
+    drive: "{{ pagefile.driveletter }}"
+    initial_size: "{{ pagefile_add }}"
+    maximum_size: "{{ pagefile_add }}"
+    override: true
+    state: present
+  when: pagefile_drive.stat.exists

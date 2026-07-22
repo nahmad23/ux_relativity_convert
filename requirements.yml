@@ -1,0 +1,15 @@
+---
+# =============================================================================
+# requirements.yml -- Ansible collections used by the uxa_relativity_v2 role.
+# Install with:  ansible-galaxy collection install -r requirements.yml
+# =============================================================================
+collections:
+  - name: ansible.windows       # win_regedit, win_feature, win_package, win_service,
+                                # win_environment, win_path, win_acl, win_group_membership,
+                                # win_file, win_stat, win_get_url, win_copy, win_template,
+                                # win_shell, win_command, win_powershell
+    version: ">=2.0.0"
+  - name: community.windows     # win_firewall_rule, win_pagefile, win_unzip, win_lineinfile
+    version: ">=2.0.0"
+  - name: community.hashi_vault # vault_read, vault_write (HashiCorp Vault integration)
+    version: ">=6.0.0"

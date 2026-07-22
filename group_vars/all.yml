@@ -1,0 +1,117 @@
+---
+# =============================================================================
+# group_vars/all.yml
+#
+# These are the per-deployment "scalr variables". In the Chef cookbook they
+# arrived as node['scalr']['variables'][...] (populated by Scalr / kitchen.yml
+# test suites). In Ansible they belong in inventory (group_vars / host_vars).
+#
+# The example values below are taken from the kitchen.yml test suites. Override
+# per host or per group of hosts (one group per Function is the natural mapping).
+#
+# `Function` selects which set of role tasks run (see roles/.../tasks/main.yml):
+#   AGT  -> base + agent + harden          (Agent server)
+#   CNV  -> base + agent + harden          (Conversion agent server)
+#   DTS  -> base + agent + harden          (DTSearch agent server)
+#   ANA  -> base + analytics + harden      (Analytics server)
+#   APP  -> base + worker + harden         (Worker server)
+#   WRK  -> base + worker + harden         (Worker server)
+#   SST  -> base + secretstore + harden    (Secret Store server)
+#   SQL  -> base + sql + harden            (SQL server)
+#   WEB  -> base + web + harden            (Web server)
+#   RDC  -> base + web + harden            (RDC server)
+#   MSB  -> base + servicebus + harden     (Message Broker / RabbitMQ server)
+#   ELM  -> base + datagrid + harden       (DataGrid master)
+#   ELD  -> base + datagrid + harden       (DataGrid data)
+#   ELC  -> base + datagrid + harden       (DataGrid client)
+# =============================================================================
+
+# In Chef this was node['policy_group']; 'local' == Test Kitchen. Set to 'local'
+# to enable the disk-initialisation blocks and test-only behaviour, or 'prod'
+# for real deployments.
+policy_group: 'prod'
+
+scalr:
+  variables:
+    # --- Common to every Function ---
+    Geocode: 'AUSSC'
+    Application: 'REL'
+    AppInstance: 2
+    Domain: 'test-agt'
+    Service_User: 'azure'
+    Service_Password: 'P2ssw0rd!'
+    Function: 'AGT'
+    SCALR_FARM_ROLE_ALIAS: 'Agent-Server-Core'
+
+    # --- Versions ---
+    Relativity_Version: '11.1.582.3'
+    SecretStore_Version: '1.2.603.5'
+    Invariant_Version: '6.1.512.1'
+    CAAT_Version: '4.6.7'
+    RDC_Version: '11.1.14'
+    Erlang_MinorVersion: '24.3.4.2'
+    Erlang_MajorVersion: '12.13.2.2'
+    Erlang_SSLVersion: '10.7.3.2'
+    RabbitMQ_Version: '3.9.21'
+    RabbitMQ_Cookie: 'SW*@w1w99WwKE41Bs*yj5G^Z'
+
+    # --- Secret Store ---
+    SecretStore_URL: 'test-secretstore.fakedomain.org'
+    SecretStore_Thumbprint: 'ta4kvc310r6dt94mn27jkmz40yngntd197kz0p1uvxqcax855r'
+
+    # --- Passwords / accounts ---
+    EDDSDBO_Password: 'P@55word12345!'
+    SQL_User: 'azure'
+
+    # --- SQL / Relativity install parameters (Response file inputs) ---
+    PRIMARYSQLINSTANCE: 'test-sql.fakedomain.org'
+    DISTRIBUTEDSQLINSTANCE: 'test-sql.fakedomain.org'
+    RELATIVITYSQLINSTANCE: 'test-sql.fakedomain.org'
+    SQLINSTANCE: 'test-sql.fakedomain.org'
+    SQL_Primary: 'test-sql.fakedomain.org'
+    RELATIVITYINSTANCENAME: 'Relativity'
+    IDENTITYSERVERURL: 'test-identity.fakedomain.org'
+    DEFAULTFILEREPOSITORY: 'C:\Temp'
+    Default_FileRepo: 'C:\Temp'
+    DEFAULTAGENTS: 1
+    Default_Agents: 1
+    DTSEARCHINDEXPATH: 'C:\Temp'
+    EDDSFILESHARE: 'C:\Temp'
+    FULLTEXTDIR: 'C:\Temp'
+    CACHELOCATION: 'C:\Temp'
+    LDFDIR: 'S:\Logs'
+    MDFDIR: 'R:\Data'
+    DATABASEBACKUPDIR: 'C:\Temp'
+    DATAFILESNETWORKPATH: 'C:\Temp'
+    NISTPACKAGEPATH: 'C:\Temp'
+    WORKERNETWORKPATH: 'C:\Temp'
+    INSTALLQUEUEMANAGER: 1
+    INSTALLWORKER: 0
+    INV_DEFAULTFILEREPOSITORY: 'C:\Temp'
+    INV_LDFDIR: 'S:\Logs'
+    INV_MDFDIR: 'R:\Data'
+
+    # --- SQL data disks ---
+    Data_DriveLetter: 'R'
+    Data_DriveLabel: 'Data'
+    Log_DriveLetter: 'S'
+    Log_DriveLabel: 'Logs'
+    Temp_DriveLetter: 'T'
+    Temp_DriveLabel: 'TempDB'
+    # BCP_DriveLetter: 'B'   # (referenced only by commented-out BCP share tasks)
+
+    # --- Analytics ---
+    AnalyticsData_DriveLetter: 'F'
+    AnalyticsData_DriveLabel: 'AnalyticsData'
+    AnalyticsData_Path: 'C:\Temp'
+
+    # --- Service Bus / RabbitMQ ---
+    SERVERFQDN: 'test-rabbit.unitedlex.global'
+
+# HashiCorp Vault connection (was the `secrets/vault` data bag in Chef).
+# KEEP THIS ENCRYPTED with ansible-vault in real environments.
+vault:
+  uxa_relativity_v2:
+    address: 'https://vault.unitedlex.global:8200'
+    token: 'REPLACE_WITH_VAULT_TOKEN'
+    # role_name: 'uxa_relativity_v2-test'   # optional AppRole

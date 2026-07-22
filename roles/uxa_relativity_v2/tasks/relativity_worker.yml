@@ -1,0 +1,119 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_worker.yml
+# Converted from recipes/relativity_worker.rb (Functions APP / WRK)
+# =============================================================================
+
+# include_recipe 'uxs_notes::default'
+- name: Install Lotus Notes (was uxs_notes::default)
+  ansible.windows.win_package:
+    path: "{{ software.basesource }}/notes/notes-installer.exe"
+    state: present
+    arguments: /S
+  ignore_errors: true   # dependency cookbook -- adjust to your package source
+
+# ----- Disk init (local/kitchen only) -----
+- name: Initialise pagefile disk (local/kitchen only)
+  ansible.builtin.include_tasks: _disk_init.yml
+  loop:
+    - { letter: "{{ pagefile.driveletter }}", label: "{{ pagefile.drivelabel }}" }
+  loop_control:
+    loop_var: disk
+  when: policy_group == 'local'
+
+# ----- Additional pagefile -----
+- name: Check pagefile drive is present
+  ansible.windows.win_stat:
+    path: "{{ pagefile.driveletter }}:\\"
+  register: pagefile_drive
+
+- name: Set additional pagefile
+  community.windows.win_pagefile:
+    drive: "{{ pagefile.driveletter }}"
+    initial_size: "{{ pagefile_add }}"
+    maximum_size: "{{ pagefile_add }}"
+    override: true
+    state: present
+  when: pagefile_drive.stat.exists
+
+# ---------------------------------------------------------------------------
+# Zip-based Office viewer/app installs (download -> extract -> delete zip -> install)
+# ---------------------------------------------------------------------------
+- name: Install zip-packaged Office applications
+  ansible.builtin.include_tasks: _install_zip_package.yml
+  loop:
+    - name: "{{ software.office2016.installer.name }}"
+      source: "{{ software.office2016.installer.source }}"
+      destination: "{{ software.office2016.installer.destination }}"
+      zip: "{{ software.office2016.installer.zip }}"
+      subdir: 'Office2016'
+      bits: "{{ software.office2016.installer.bits }}"
+      options: "{{ software.office2016.installer.options }}"
+    - name: "{{ software.project2016.installer.name }}"
+      source: "{{ software.project2016.installer.source }}"
+      destination: "{{ software.project2016.installer.destination }}"
+      zip: "{{ software.project2016.installer.zip }}"
+      subdir: 'Project2016'
+      bits: "{{ software.project2016.installer.bits }}"
+      options: "{{ software.project2016.installer.options }}"
+    - name: "{{ software.visio2016.installer.name }}"
+      source: "{{ software.visio2016.installer.source }}"
+      destination: "{{ software.visio2016.installer.destination }}"
+      zip: "{{ software.visio2016.installer.zip }}"
+      subdir: 'Visio2016'
+      bits: "{{ software.visio2016.installer.bits }}"
+      options: "{{ software.visio2016.installer.options }}"
+    - name: "{{ software.jungum.installer.name }}"
+      source: "{{ software.jungum.installer.source }}"
+      destination: "{{ software.jungum.installer.destination }}"
+      zip: "{{ software.jungum.installer.zip }}"
+      subdir: 'JungUm'
+      bits: "{{ software.jungum.installer.bits }}"
+      options: "{{ software.jungum.installer.options }}"
+    - name: "{{ software.officeviewer.installer.name }}"
+      source: "{{ software.officeviewer.installer.source }}"
+      destination: "{{ software.officeviewer.installer.destination }}"
+      zip: "{{ software.officeviewer.installer.zip }}"
+      subdir: 'OfficeViewer'
+      bits: "{{ software.officeviewer.installer.bits }}"
+      options: ''   # officeviewer had no options in the recipe
+  loop_control:
+    loop_var: pkg
+    label: "{{ pkg.name }}"
+
+# ----- Non-zip installs -----
+- name: Install eDrawings
+  ansible.windows.win_package:
+    path: "{{ software.edrawings.installer.source }}/{{ software.edrawings.installer.bits }}"
+    arguments: "{{ software.edrawings.installer.options }}"
+    state: present
+
+- name: Install MS Works 6-9 Converter
+  ansible.windows.win_package:
+    path: "{{ software.msworks.installer.source }}/{{ software.msworks.installer.bits }}"
+    arguments: "{{ software.msworks.installer.options }}"
+    state: present
+
+# ----- Worker firewall rules -----
+- name: Allow worker inbound TCP ports
+  community.windows.win_firewall_rule:
+    name: "{{ item }}-Inbound"
+    localport: "{{ item }}"
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  loop:
+    - '135'
+    - '445'
+    - '6860'
+    - '6861'
+    - '6862'
+    - '49152-65535'
+
+# ---------------------------------------------------------------------------
+# NOTE: Invariant installer copy/extract + Response-Invariant steps were
+# commented out in the source recipe. Template Response-Invariant.txt.j2 is
+# provided for re-enablement.
+# ---------------------------------------------------------------------------

@@ -1,0 +1,12 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/handlers/main.yml
+# Equivalent of the Chef `notifies :restart, 'windows_service[RabbitMQ]'`.
+# =============================================================================
+
+- name: Restart RabbitMQ
+  ansible.windows.win_service:
+    name: RabbitMQ
+    state: restarted
+  # Guard: only if the service exists (Chef used ::Win32::Service.exists?)
+  when: policy_group != 'local'

@@ -1,0 +1,406 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/defaults/main.yml
+#
+# Converted from the Chef cookbook `uxa_relativity_v2` attribute files:
+#   attributes/default.rb
+#   attributes/relativity_base.rb
+#   attributes/relativity_agent.rb
+#   attributes/relativity_analytics.rb
+#   attributes/relativity_servicebus.rb
+#   attributes/relativity_harden.rb
+#   attributes/audit.rb
+#
+# Every Chef `default['x']['y']` attribute is represented here with the same
+# nested key structure so the mapping stays 1:1 and auditable. Values that were
+# computed at runtime in Chef with `powershell_out!` (total memory, pagefile
+# max, service-user SID, Java heap) are NOT static and are calculated inside the
+# tasks instead (see tasks/relativity_base.yml and relativity_analytics.yml).
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# from attributes/default.rb  -- Folder Attributes
+# -----------------------------------------------------------------------------
+directory:
+  logsfolder: 'C:\Logs'
+  secretstore_version: '1.2.603.5'
+  Relativity_Version: '12.1.537.3'
+  rel_installers_folder: 'C:\Relativity_Installers'
+  secretstore:
+    client: "{{ directory.rel_installers_folder }}\\Secret Store\\{{ directory.secretstore_version }}\\Client"
+  reltempfolder: "{{ directory.rel_installers_folder }}\\Temp"
+  tempfolder: 'C:\Temp'
+  certs: 'C:\Certs'
+  scripts: 'C:\Scripts'
+  # from attributes/relativity_analytics.rb
+  caat: 'C:\CAAT'
+  # from attributes/relativity_servicebus.rb
+  servicebus: 'C:\ServiceBus'
+
+# -----------------------------------------------------------------------------
+# from attributes/default.rb  -- Software Attributes
+# -----------------------------------------------------------------------------
+software:
+  basesource: 'http://mirrors.unitedlex.global/software'
+  relativity:
+    basesource: "{{ software.basesource }}/relativity/Installers"
+    installer:
+      source: "{{ software.relativity.basesource }}/Relativity/{{ directory.Relativity_Version }}"
+      destination: "{{ directory.rel_installers_folder }}\\Relativity\\{{ directory.Relativity_Version }}"
+      zip: 'Relativity.zip'
+    response:
+      file: 'RelativityResponse.txt'
+  agent:
+    installer:
+      destination: "{{ software.relativity.installer.destination }}\\Agent"
+      zip: 'Agent.zip'
+    response:
+      template: 'Response-Agent.txt.j2'
+  conversion:
+    installer:
+      destination: "{{ software.relativity.installer.destination }}\\Conversion"
+      zip: 'Conversion.zip'
+    response:
+      template: 'Response-Conversion.txt.j2'
+  dtsearch:
+    installer:
+      destination: "{{ software.relativity.installer.destination }}\\DTSearch"
+      zip: 'DTSearch.zip'
+    response:
+      template: 'Response-DTSearch.txt.j2'
+  web:
+    installer:
+      destination: "{{ software.relativity.installer.destination }}\\Web"
+      zip: 'Web.zip'
+    cert:
+      source: "{{ software.relativity.basesource }}/Misc/Certs/Web-{{ scalr.variables.Geocode }}-{{ scalr.variables.Application }}{{ scalr.variables.AppInstance }}.pfx"
+    response:
+      template: 'Response-Web.txt.j2'
+  rdc:
+    installer:
+      source: "{{ software.relativity.basesource }}/RDC/{{ scalr.variables.RDC_Version }}"
+      destination: "{{ directory.rel_installers_folder }}\\RDC\\{{ scalr.variables.RDC_Version }}"
+      bits: 'Relativity.Desktop.Client.Setup.exe'
+    response:
+      template: 'Response-RDC.txt.j2'
+      file: 'RelativityResponse.txt'
+  invariant:
+    installer:
+      source: "{{ software.relativity.basesource }}/Invariant/{{ scalr.variables.Invariant_Version }}"
+      destination: "{{ directory.rel_installers_folder }}\\Invariant\\{{ scalr.variables.Invariant_Version }}"
+      zip: 'Invariant.zip'
+      batch: 'Install.bat'
+    response:
+      template: 'Response-Invariant.txt.j2'
+      file: 'InvariantResponse.txt'
+  caat:
+    installer:
+      source: "{{ software.relativity.basesource }}/CAAT/{{ scalr.variables.CAAT_Version }}"
+      destination: "{{ directory.rel_installers_folder }}\\CAAT\\{{ scalr.variables.CAAT_Version }}"
+      zip: 'CAAT.zip'
+  secretstore:
+    installer:
+      source: "{{ software.relativity.basesource }}/Secret Store/{{ scalr.variables.SecretStore_Version }}"
+      destination: "{{ directory.rel_installers_folder }}\\Secret Store\\{{ scalr.variables.SecretStore_Version }}"
+      zip: 'SecretStore.zip'
+    client:
+      bits: 'secretstore.exe'
+      script: 'clientregistration.ps1'
+      template: 'Client-Registration.ps1.j2'
+    cert:
+      source: "{{ software.relativity.basesource }}/Misc/Certs/SecretStore-{{ scalr.variables.Geocode }}-{{ scalr.variables.Application }}{{ scalr.variables.AppInstance }}.pfx"
+  netfx:
+    installer:
+      source: "{{ software.relativity.basesource }}/Misc"
+      destination: "{{ directory.reltempfolder }}"
+      zip: 'netfx.zip'
+      guard: '(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v3.5\1033").Install -eq 1'
+  net472:
+    installer:
+      name: '.NET 4.7.2'
+      source: "{{ software.relativity.basesource }}/Misc"
+      bits: 'ndp472-kb4054530-x86-x64-allos-enu.exe'
+      options: '/q /norestart'
+      guard: '(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full").Version -eq "4.7.03190"'
+  mvc2010:
+    x86:
+      installer:
+        name: 'Microsoft Visual C++ 2010 x86 Redistributable - 10.0.40219'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2010"
+        bits: 'vcredist_x86.exe'
+        options: '/q /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\10.0\VC\VCRedist\x86").Version -eq "v10.0.40219.325"'
+    x64:
+      installer:
+        name: 'Microsoft Visual C++ 2010 x64 Redistributable - 10.0.40219'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2010"
+        bits: 'vcredist_x64.exe'
+        options: '/q /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\10.0\VC\VCRedist\x64").Version -eq "v10.0.40219.325"'
+  mvc2012:
+    x86:
+      installer:
+        name: 'Microsoft Visual C++ 2012 Redistributable (x86) - 11.0.61030'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2012"
+        bits: 'vcredist_x86.exe'
+        options: '/install /quiet /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\11.0\VC\Runtimes\x86").Version -eq "v11.0.61030.00"'
+    x64:
+      installer:
+        name: 'Microsoft Visual C++ 2012 Redistributable (x64) - 11.0.61030'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2012"
+        bits: 'vcredist_x64.exe'
+        options: '/install /quiet /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\11.0\VC\Runtimes\x64").Version -eq "v11.0.61030.00"'
+  mvc2013:
+    x86:
+      installer:
+        name: 'Microsoft Visual C++ 2013 Redistributable (x86) - 12.0.40664'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2013"
+        bits: 'vcredist_x86.exe'
+        options: '/install /quiet /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\12.0\VC\Runtimes\x86").Version -eq "v12.0.40664.00"'
+    x64:
+      installer:
+        name: 'Microsoft Visual C++ 2013 Redistributable (x64) - 12.0.40664'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2013"
+        bits: 'vcredist_x64.exe'
+        options: '/install /quiet /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\12.0\VC\Runtimes\x64").Version -eq "v12.0.40664.00"'
+  mvc2015:
+    x86:
+      installer:
+        name: 'Microsoft Visual C++ 2015-2019 Redistributable (x86) - 14.22.27821'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2015"
+        bits: 'vcredist_x86.exe'
+        options: '/install /quiet /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x86").Version -ge "v14.22.27821.00"'
+    x64:
+      installer:
+        name: 'Microsoft Visual C++ 2015-2019 Redistributable (x64) - 14.22.27821'
+        source: "{{ software.relativity.basesource }}/Misc/MVC/2015"
+        bits: 'vcredist_x64.exe'
+        options: '/install /quiet /norestart'
+        guard: '(Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64").Version -ge "v14.22.27821.00"'
+  msedge:
+    installer:
+      name: 'Microsoft Edge'
+      source: "{{ software.relativity.basesource }}/Misc"
+      bits: 'MicrosoftEdgeEnterpriseX64.msi'
+      options: '/qn'
+  office2016:
+    installer:
+      name: 'Microsoft Office Professional Plus 2016'
+      source: "{{ software.relativity.basesource }}/Misc"
+      destination: "{{ directory.reltempfolder }}"
+      zip: 'Office2016.zip'
+      bits: 'setup.exe'
+      options: '/adminfile office2016-custom.MSP'
+  project2016:
+    installer:
+      name: 'Microsoft Project Professional 2016'
+      source: "{{ software.relativity.basesource }}/Misc"
+      destination: "{{ directory.reltempfolder }}"
+      zip: 'Project2016.zip'
+      bits: 'setup.exe'
+      options: '/adminfile project-custom.MSP'
+  visio2016:
+    installer:
+      name: 'Microsoft Visio Professional 2016'
+      source: "{{ software.relativity.basesource }}/Misc"
+      destination: "{{ directory.reltempfolder }}"
+      zip: 'Visio2016.zip'
+      bits: 'setup.exe'
+      options: '/adminfile visio-custom.MSP'
+  edrawings:
+    installer:
+      name: 'eDrawings'
+      source: "{{ software.relativity.basesource }}/Misc"
+      bits: 'eDrawings.msi'
+      options: '/qb /norestart'
+  jungum:
+    installer:
+      name: 'JungUm Global Viewer'
+      source: "{{ software.relativity.basesource }}/Misc"
+      destination: "{{ directory.reltempfolder }}"
+      zip: 'JungUm.zip'
+      bits: 'JungUm.exe'
+      options: "{{ directory.reltempfolder }}\\JungUm\\JungUm.exe /s /f1\"{{ directory.reltempfolder }}\\JungUm\\JungUm.iss\""
+  msworks:
+    installer:
+      name: 'Microsoft Works 6-9 Converter'
+      source: "{{ software.relativity.basesource }}/Misc"
+      bits: 'WorksConv.exe'
+      options: '/quiet /norestart'
+  officeviewer:
+    installer:
+      name: 'Thinkfree Office Viewer'
+      source: "{{ software.relativity.basesource }}/Misc"
+      destination: "{{ directory.reltempfolder }}"
+      zip: 'Office_Viewer.zip'
+      bits: 'Setup.exe'
+  erlang:
+    installer:
+      name: "Erlang OTP {{ scalr.variables.Erlang_MinorVersion }} ({{ scalr.variables.Erlang_MajorVersion }})"
+      source: "{{ software.relativity.basesource }}/Erlang/{{ scalr.variables.Erlang_MinorVersion }}"
+      bits: "otp_win64_{{ scalr.variables.Erlang_MinorVersion }}.exe"
+      options: '/S'
+      path: "C:\\Program Files\\erl-{{ scalr.variables.Erlang_MinorVersion }}"
+      guard: "(Get-ItemProperty \"HKLM:\\SOFTWARE\\Wow6432Node\\Ericsson\\Erlang\\{{ scalr.variables.Erlang_MajorVersion }}\") -ne $null"
+    env:
+      path: "C:\\Program Files\\erl-{{ scalr.variables.Erlang_MinorVersion }}"
+  rabbitmq:
+    installer:
+      name: 'RabbitMQ'
+      source: "{{ software.relativity.basesource }}/RabbitMQ/{{ scalr.variables.RabbitMQ_Version }}"
+      bits: "rabbitmq-server-{{ scalr.variables.RabbitMQ_Version }}.exe"
+      options: '/S'
+      path: "C:\\Program Files\\RabbitMQ Server\\rabbitmq_server-{{ scalr.variables.RabbitMQ_Version }}"
+    env:
+      path: "C:\\Program Files\\RabbitMQ Server\\rabbitmq_server-{{ scalr.variables.RabbitMQ_Version }}"
+
+# -----------------------------------------------------------------------------
+# from attributes/default.rb  -- Network Attributes
+# -----------------------------------------------------------------------------
+network:
+  secretstore:
+    service:
+      port: 9090
+    client:
+      port: 10000
+
+# -----------------------------------------------------------------------------
+# from attributes/default.rb  -- misc
+# -----------------------------------------------------------------------------
+uxa_relativity_v2:
+  win_passwordrotation: false
+  # windows_server_version is derived at runtime (see tasks/audit.yml)
+
+# -----------------------------------------------------------------------------
+# from attributes/relativity_base.rb  -- Pagefile Attributes
+# -----------------------------------------------------------------------------
+pagefile:
+  driveletter: 'P'
+  drivelabel: 'PageFile'
+  os: 4095
+  # `max` and `add` are computed at runtime from total physical memory in
+  # tasks/relativity_base.yml (Chef used powershell_out! at compile time).
+
+# -----------------------------------------------------------------------------
+# from attributes/relativity_base.rb  -- Optimization / Registry Attributes
+# -----------------------------------------------------------------------------
+# NOTE: relativity.serviceuser.sid is resolved at runtime (tasks/relativity_base.yml)
+registry:
+  powerscheme:
+    keypath: 'HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes'
+    value: 'ActivePowerScheme'
+    data: '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
+  visualeffects:
+    # keypath completed at runtime using the resolved service-user SID
+    value: 'VisualFXSetting'
+    data: 2
+  proxysettings:
+    value: 'ProxyEnable'
+    data: 0
+  procsheduling:
+    keypath: 'HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl'
+    value: 'Win32PrioritySeparation'
+    data: 24
+  mstdc:
+    keypath: 'HKLM\SOFTWARE\Microsoft\MSDTC\Security'
+    values:
+      - { name: 'NetworkDtcAccess', data: 1 }
+      - { name: 'NetworkDtcAccessAdmin', data: 1 }
+      - { name: 'NetworkDtcAccessClients', data: 1 }
+      - { name: 'NetworkDtcAccessInbound', data: 1 }
+      - { name: 'NetworkDtcAccessOutbound', data: 1 }
+      - { name: 'NetworkDtcAccessTransactions', data: 1 }
+
+# -----------------------------------------------------------------------------
+# from attributes/relativity_base.rb  -- ACL folders
+# -----------------------------------------------------------------------------
+acl:
+  programdata: 'C:\ProgramData'
+  packagecache: 'C:\ProgramData\Package Cache'
+  appdata:
+    temp: "C:\\Users\\{{ scalr.variables.Service_User }}\\Appdata\\Local\\Temp"
+    packages: "C:\\Users\\{{ scalr.variables.Service_User }}\\Appdata\\Local\\Packages"
+
+# -----------------------------------------------------------------------------
+# from attributes/relativity_agent.rb  -- Windows Features for agent servers
+# -----------------------------------------------------------------------------
+agent:
+  features:
+    - NET-HTTP-Activation
+    - NET-Non-HTTP-Activ
+    - NET-Framework-45-ASPNET
+    - NET-WCF-HTTP-Activation45
+
+# -----------------------------------------------------------------------------
+# from attributes/relativity_analytics.rb  -- Java Heap Attributes
+# `min`/`max` are computed at runtime from total memory (tasks/relativity_analytics.yml)
+# -----------------------------------------------------------------------------
+javaheap:
+  config: "{{ directory.caat }}\\bin\\env.cmd"
+
+# -----------------------------------------------------------------------------
+# from attributes/relativity_web.rb  -- IIS roles & features (was inline in recipe)
+# -----------------------------------------------------------------------------
+web:
+  features:
+    - NET-HTTP-Activation
+    - NET-Non-HTTP-Activ
+    - NET-Framework-45-ASPNET
+    - NET-WCF-Services45
+    - NET-WCF-HTTP-Activation45
+    - NET-WCF-MSMQ-Activation45
+    - NET-WCF-Pipe-Activation45
+    - NET-WCF-TCP-Activation45
+    - NET-WCF-TCP-PortSharing45
+    - Web-Common-Http
+    - Web-Default-Doc
+    - Web-Dir-Browsing
+    - Web-Http-Errors
+    - Web-Static-Content
+    - Web-Http-Redirect
+    - Web-Health
+    - Web-Http-Logging
+    - Web-Request-Monitor
+    - Web-Http-Tracing
+    - Web-Performance
+    - Web-Stat-Compression
+    - Web-Security
+    - Web-Filtering
+    - Web-Basic-Auth
+    - Web-Windows-Auth
+    - Web-App-Dev
+    - Web-Net-Ext
+    - Web-Net-Ext45
+    - Web-Asp-Net
+    - Web-Asp-Net45
+    - Web-ISAPI-Ext
+    - Web-ISAPI-Filter
+    - Web-Mgmt-Tools
+    - Web-Mgmt-Console
+
+# -----------------------------------------------------------------------------
+# from attributes/relativity_sql.rb  -- Failover Cluster features (was inline in recipe)
+# -----------------------------------------------------------------------------
+sql:
+  features:
+    - Failover-Clustering
+    - RSAT-Clustering
+    - RSAT-Clustering-Mgmt
+    - RSAT-Clustering-PowerShell
+    - RSAT-Clustering-AutomationServer
+
+# -----------------------------------------------------------------------------
+# from attributes/audit.rb
+# -----------------------------------------------------------------------------
+audit:
+  fetcher: 'chef-server-automate'
+  reporter: 'chef-server-automate'
+  waiver_file: 'c:/chef/audit_waiver.yaml'
+  interval:
+    enabled: true
+    time: 90

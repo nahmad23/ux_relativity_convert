@@ -1,0 +1,18 @@
+[
+    {server, [
+        {cacertfile, "C:/Certs/cert_chain.pem"},
+        {certfile, "C:/Certs/cert.pem"},
+        {keyfile, "C:/Certs/cert.key"},
+        {secure_renegotiate, true},
+        {verify, verify_peer},
+        {fail_if_no_peer_cert, false}
+    ]},
+    {client, [
+        {cacertfile, "C:/Certs/cert_chain.pem"},
+        {certfile, "C:/Certs/cert.pem"},
+        {keyfile, "C:/Certs/cert.key"},
+        {secure_renegotiate, true},
+        {verify, verify_peer},
+        {fail_if_no_peer_cert, false}
+    ]}
+].

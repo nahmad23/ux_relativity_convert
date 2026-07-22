@@ -1,0 +1,45 @@
+---
+# =============================================================================
+# group_vars/rel_sql.yml -- overrides for the SQL server group.
+# Merges over group_vars/all.yml. Values mirror the kitchen.yml `rel-sql` suite.
+#
+# NOTE: Ansible does NOT deep-merge dicts by default, so when overriding a few
+# keys inside scalr.variables you must either (a) enable
+# `hash_behaviour = merge` in ansible.cfg (already set in this repo), or
+# (b) restate the whole scalr.variables dict here. This repo uses merge.
+# =============================================================================
+
+policy_group: 'prod'
+
+scalr:
+  variables:
+    Function: 'SQL'
+    SCALR_FARM_ROLE_ALIAS: 'SQL-Server'
+    Domain: 'test-sql'
+    Invariant_Version: '6.1.512.1'
+    PRIMARYSQLINSTANCE: 'test-sql.fakedomain.org'
+    DISTRIBUTEDSQLINSTANCE: 'test-sql.fakedomain.org'
+    RELATIVITYSQLINSTANCE: 'test-sql.fakedomain.org'
+    SQLINSTANCE: 'test-sql.fakedomain.org'
+    DTSEARCHINDEXPATH: 'C:\Temp'
+    EDDSFILESHARE: 'C:\Temp'
+    FULLTEXTDIR: 'C:\Temp'
+    LDFDIR: 'S:\Logs'
+    MDFDIR: 'R:\Data'
+    RELATIVITYINSTANCENAME: 'Relativity'
+    DATAFILESNETWORKPATH: 'C:\Temp'
+    IDENTITYSERVERURL: 'test-identity.fakedomain.org'
+    INSTALLQUEUEMANAGER: 1
+    INSTALLWORKER: 0
+    INV_DEFAULTFILEREPOSITORY: 'C:\Temp'
+    INV_LDFDIR: 'S:\Logs'
+    INV_MDFDIR: 'R:\Data'
+    NISTPACKAGEPATH: 'C:\Temp'
+    WORKERNETWORKPATH: 'C:\Temp'
+    SQL_User: 'azure'
+    Data_DriveLetter: 'R'
+    Data_DriveLabel: 'Data'
+    Log_DriveLetter: 'S'
+    Log_DriveLabel: 'Logs'
+    Temp_DriveLetter: 'T'
+    Temp_DriveLabel: 'TempDB'

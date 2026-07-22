@@ -1,0 +1,38 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/_install_zip_package.yml
+#
+# Helper reproducing the download -> extract -> delete-zip -> install pattern
+# used repeatedly in relativity_worker.rb.
+# Expects loop var `pkg` = a dict with:
+#   name, source, destination, zip, subdir, bits, options
+# =============================================================================
+
+- name: "Check extracted dir for {{ pkg.name }}"
+  ansible.windows.win_stat:
+    path: "{{ pkg.destination }}\\{{ pkg.subdir }}"
+  register: zip_pkg_dir
+
+- name: "Download {{ pkg.zip }}"
+  ansible.windows.win_get_url:
+    url: "{{ pkg.source }}/{{ pkg.zip }}"
+    dest: "{{ pkg.destination }}\\{{ pkg.zip }}"
+  when: not zip_pkg_dir.stat.exists
+
+- name: "Extract {{ pkg.zip }}"
+  community.windows.win_unzip:
+    src: "{{ pkg.destination }}\\{{ pkg.zip }}"
+    dest: "{{ pkg.destination }}\\{{ pkg.subdir }}"
+    creates: "{{ pkg.destination }}\\{{ pkg.subdir }}"
+  when: not zip_pkg_dir.stat.exists
+
+- name: "Delete {{ pkg.zip }} after extract"
+  ansible.windows.win_file:
+    path: "{{ pkg.destination }}\\{{ pkg.zip }}"
+    state: absent
+
+- name: "Install {{ pkg.name }}"
+  ansible.windows.win_package:
+    path: "{{ pkg.destination }}\\{{ pkg.subdir }}\\{{ pkg.bits }}"
+    arguments: "{{ pkg.options | default(omit) }}"
+    state: present

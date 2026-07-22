@@ -1,0 +1,41 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/audit.yml
+# Converted from recipes/audit.rb and attributes/audit.rb.
+#
+# NOTE: this is not wired into the default Function dispatch (the Chef `audit`
+# recipe was invoked separately, not from default.rb). Include it explicitly
+# where InSpec/compliance scanning is required.
+# =============================================================================
+
+- name: Gather kernel / OS facts for waiver + profile selection
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - 'min'
+      - 'distribution'
+
+- name: Determine Windows Server version for waiver file
+  ansible.builtin.set_fact:
+    windows_server_version: >-
+      {{ '2016' if 'Microsoft Windows Server 2016' in ansible_kernel | default('')
+         else ('2019' if 'Microsoft Windows Server 2019' in ansible_kernel | default('') else 'unknown') }}
+
+- name: Download audit waiver file
+  ansible.windows.win_get_url:
+    url: "http://mirrors.unitedlex.global/chef/waivers/windows/{{ windows_server_version }}-waiver.yml"
+    dest: 'c:\chef\audit_waiver.yaml'
+
+# include_recipe 'audit::default' unless node['policy_group'] == 'local'
+# The Chef `audit` cookbook ran InSpec against Chef Automate. In Ansible, run
+# your compliance scan here (e.g. call `inspec exec` via win_shell against the
+# appropriate CIS profile) only when not in local/kitchen mode.
+- name: Run compliance scan (non-local only)
+  ansible.windows.win_shell: >-
+    inspec exec {{ audit_profile | default('compliance://admin/cis-windows' + windows_server_version + '-level1-memberserver') }}
+    --waiver-file {{ audit.waiver_file }}
+    --reporter cli
+  when: policy_group != 'local'
+  register: inspec_scan
+  changed_when: false
+  failed_when: false

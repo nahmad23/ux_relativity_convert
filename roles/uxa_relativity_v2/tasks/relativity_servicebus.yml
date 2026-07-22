@@ -1,0 +1,258 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_servicebus.yml
+# Converted from recipes/relativity_servicebus.rb (Function MSB)
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Read RabbitMQ credentials from Vault
+# (Chef: rel_read_vault_secret custom resource + data_bag_item 'secrets/vault')
+# ---------------------------------------------------------------------------
+- name: Set Vault path for RabbitMQ credentials
+  ansible.builtin.set_fact:
+    rel_rabbitmq_vault_path: >-
+      {{ ('secret/data/uxa_relativity_v2/test/' if policy_group == 'local' else 'secret/data/uxa_relativity_v2/prod/')
+         ~ scalr.variables.Geocode ~ '/' ~ scalr.variables.Application ~ scalr.variables.AppInstance ~ '/rabbitmq' }}
+
+- name: Read RabbitMQ credentials from Vault
+  community.hashi_vault.vault_read:
+    url: "{{ vault.uxa_relativity_v2.address }}"
+    token: "{{ vault.uxa_relativity_v2.token }}"
+    path: "{{ rel_rabbitmq_vault_path }}"
+  delegate_to: localhost
+  register: rel_rabbitmq_secret
+  no_log: true
+
+- name: Extract RabbitMQ credential fields (handle KV2 vs KV1)
+  ansible.builtin.set_fact:
+    # KV2 raw read (path 'secret/data/...') nests values under .data.data;
+    # KV1 exposes them at .data. Mirrors the cookbook's secret.data[:data] check.
+    rabbitmq_creds: "{{ rel_rabbitmq_secret.data.data | default(rel_rabbitmq_secret.data) }}"
+  no_log: true
+
+# ---------------------------------------------------------------------------
+# Request certificate from Vault PKI (used for traefik / RabbitMQ TLS)
+# (Chef: rel_vault_pki_certificate custom resource)
+# ---------------------------------------------------------------------------
+- name: Build PKI certificate options
+  ansible.builtin.set_fact:
+    servicebus_cert_common_name: >-
+      {{ (inventory_hostname_short ~ '.unitedlex.global') if policy_group == 'local'
+         else (inventory_hostname_short ~ '.' ~ scalr.variables.Domain) }}
+    servicebus_pki_options: >-
+      {{
+        {
+          'common_name': ((inventory_hostname_short ~ '.unitedlex.global') if policy_group == 'local' else (inventory_hostname_short ~ '.' ~ scalr.variables.Domain)),
+          'ip_sans': (ansible_ip_addresses | default([ansible_host]) | first),
+          'alt_names': scalr.variables.SERVERFQDN,
+          'ttl': ('121h' if policy_group == 'local' else '43800h')
+        }
+      }}
+
+- name: Issue RabbitMQ TLS certificate from Vault PKI
+  ansible.builtin.include_tasks: _vault_pki_certificate.yml
+  vars:
+    pki_common_name: "{{ servicebus_cert_common_name }}"
+    pki_vault_address: "{{ vault.uxa_relativity_v2.address }}"
+    pki_vault_token: "{{ vault.uxa_relativity_v2.token }}"
+    pki_vault_mount: 'pki_int'
+    pki_vault_role: 'unitedlex-global'
+    pki_options: "{{ servicebus_pki_options }}"
+    pki_cert_path: "{{ directory.certs }}\\cert.pem"
+    pki_cert_chain_path: "{{ directory.certs }}\\cert_chain.pem"
+    pki_cert_fullchain_path: "{{ directory.certs }}\\cert_fullchain.pem"
+    pki_cert_key_path: "{{ directory.certs }}\\cert.key"
+    pki_expiring_days: 5
+  notify: Restart RabbitMQ
+
+# ---------------------------------------------------------------------------
+# Add cluster nodes to hosts file (non-local only)
+# (Chef read node['scalr']['roles'] from Scalr Ohai; supply rabbit_hosts in
+#  inventory as a list of "ip hostname" strings for the cluster members.)
+# ---------------------------------------------------------------------------
+- name: Add RabbitMQ cluster nodes to hosts file
+  community.windows.win_lineinfile:
+    path: 'C:\Windows\System32\drivers\etc\hosts'
+    line: "{{ item }}"
+    state: present
+  loop: "{{ rabbit_hosts | default([]) }}"
+  when: policy_group != 'local'
+
+# ---------------------------------------------------------------------------
+# RabbitMQ directory and environment variables
+# ---------------------------------------------------------------------------
+- name: Create RabbitMQ ServiceBus directory
+  ansible.windows.win_file:
+    path: "{{ directory.servicebus }}"
+    state: directory
+
+- name: Set RABBITMQ_SERVER env var
+  ansible.windows.win_environment:
+    name: RABBITMQ_SERVER
+    value: "{{ software.rabbitmq.env.path }}"
+    level: machine
+
+- name: Set RABBITMQ_BASE env var
+  ansible.windows.win_environment:
+    name: RABBITMQ_BASE
+    value: "{{ directory.servicebus }}"
+    level: machine
+
+- name: Append RabbitMQ sbin to PATH
+  ansible.windows.win_path:
+    elements:
+      - '%RABBITMQ_SERVER%\sbin'
+
+- name: Set RABBITMQ_CONFIG_FILE env var
+  ansible.windows.win_environment:
+    name: RABBITMQ_CONFIG_FILE
+    value: "{{ directory.servicebus }}\\rabbitmq.conf"
+    level: machine
+
+- name: Set RABBITMQ_CONF_ENV_FILE env var
+  ansible.windows.win_environment:
+    name: RABBITMQ_CONF_ENV_FILE
+    value: "{{ directory.servicebus }}\\rabbitmq-env-conf.bat"
+    level: machine
+
+- name: Set RABBITMQ_USE_LONGNAME env var
+  ansible.windows.win_environment:
+    name: RABBITMQ_USE_LONGNAME
+    value: 'true'
+    level: machine
+
+# ---------------------------------------------------------------------------
+# RabbitMQ configuration templates
+# ---------------------------------------------------------------------------
+- name: Render rabbitmq_definitions.json
+  ansible.windows.win_template:
+    src: rabbitmq_definitions.json.j2
+    dest: "{{ directory.servicebus }}\\rabbitmq_definitions.json"
+
+- name: Render inter_node_tls.config
+  ansible.windows.win_template:
+    src: inter_node_tls_config.j2
+    dest: "{{ directory.servicebus }}\\inter_node_tls.config"
+
+- name: Render rabbitmq-env-conf.bat
+  ansible.windows.win_template:
+    src: rabbitmq_env_conf.bat.j2
+    dest: "{{ directory.servicebus }}\\rabbitmq-env-conf.bat"
+
+- name: Render rabbitmq.conf
+  ansible.windows.win_template:
+    src: rabbitmq_conf.j2
+    dest: "{{ directory.servicebus }}\\rabbitmq.conf"
+  notify: Restart RabbitMQ
+
+# ---------------------------------------------------------------------------
+# Install Erlang
+# ---------------------------------------------------------------------------
+- name: Check Erlang already installed
+  ansible.windows.win_stat:
+    path: "{{ software.erlang.installer.path }}\\bin\\erl.exe"
+  register: erlang_installed
+
+- name: Install Erlang
+  ansible.windows.win_package:
+    path: "{{ software.erlang.installer.source }}/{{ software.erlang.installer.bits }}"
+    arguments: "{{ software.erlang.installer.options }}"
+    state: present
+  when: not erlang_installed.stat.exists
+
+- name: Set ERLANG_HOME env var
+  ansible.windows.win_environment:
+    name: ERLANG_HOME
+    value: "{{ software.erlang.env.path }}"
+    level: machine
+
+# ---------------------------------------------------------------------------
+# Install RabbitMQ
+# ---------------------------------------------------------------------------
+- name: Check RabbitMQ already installed
+  ansible.windows.win_stat:
+    path: "{{ software.rabbitmq.installer.path }}"
+  register: rabbitmq_installed
+
+- name: Install RabbitMQ
+  ansible.windows.win_package:
+    path: "{{ software.rabbitmq.installer.source }}/{{ software.rabbitmq.installer.bits }}"
+    arguments: "{{ software.rabbitmq.installer.options }}"
+    state: present
+  when: not rabbitmq_installed.stat.exists
+
+# ---------------------------------------------------------------------------
+# Erlang cookie files (system profile, current user, service user)
+# ---------------------------------------------------------------------------
+- name: Write Erlang cookie (systemprofile)
+  ansible.windows.win_copy:
+    content: "{{ scalr.variables.RabbitMQ_Cookie }}"
+    dest: 'C:\Windows\System32\config\systemprofile\.erlang.cookie'
+
+- name: Write Erlang cookie (current user profile)
+  ansible.windows.win_copy:
+    content: "{{ scalr.variables.RabbitMQ_Cookie }}"
+    dest: "{{ ansible_env.USERPROFILE }}\\.erlang.cookie"
+
+- name: Check service-user profile exists
+  ansible.windows.win_stat:
+    path: "C:\\Users\\{{ scalr.variables.Service_User }}"
+  register: svc_user_profile
+
+- name: Write Erlang cookie (service user profile)
+  ansible.windows.win_copy:
+    content: "{{ scalr.variables.RabbitMQ_Cookie }}"
+    dest: "C:\\Users\\{{ scalr.variables.Service_User }}\\.erlang.cookie"
+  when: svc_user_profile.stat.exists
+
+# ---------------------------------------------------------------------------
+# Enable management plugin
+# ---------------------------------------------------------------------------
+- name: Check RabbitMQ management plugin enabled
+  ansible.windows.win_shell: rabbitmq-plugins.bat list --enabled
+  register: mq_plugins
+  changed_when: false
+  failed_when: false
+
+- name: Enable RabbitMQ management plugin
+  ansible.windows.win_command: rabbitmq-plugins.bat enable rabbitmq_management
+  when: "'rabbitmq_management' not in (mq_plugins.stdout | default(''))"
+  notify: Restart RabbitMQ
+
+# ---------------------------------------------------------------------------
+# Reset RabbitMQ node (non-local only) -- stop_app / reset / start_app
+# (Chef notified this chain off the PKI cert change / conf change.)
+# ---------------------------------------------------------------------------
+- name: Reset RabbitMQ app (stop / reset / start)
+  ansible.windows.win_shell: |
+    rabbitmqctl.bat stop_app
+    rabbitmqctl.bat reset
+    rabbitmqctl.bat start_app --longnames
+  when: policy_group != 'local'
+  changed_when: false
+
+# ---------------------------------------------------------------------------
+# Service Bus firewall rules
+# ---------------------------------------------------------------------------
+- name: Allow ServiceBus inbound TCP ports
+  community.windows.win_firewall_rule:
+    name: "{{ item }}-Inbound"
+    localport: "{{ item }}"
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  loop:
+    - '4369'
+    - '5551'
+    - '5552'
+    - '5671'
+    - '5672'
+    - '6000-6500'
+    - '15671'
+    - '15672'
+    - '25672'
+    - '35672-35682'
+    - '61613'
+    - '61614'

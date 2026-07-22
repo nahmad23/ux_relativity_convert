@@ -1,0 +1,31 @@
+## Cluster name
+##
+cluster_name = {{ scalr.variables.SERVERFQDN }}
+
+cluster_formation.peer_discovery_backend     = rabbit_peer_discovery_classic_config
+cluster_formation.classic_config.nodes.1 = rabbit@{{ scalr.variables.Geocode }}{{ scalr.variables.Application }}{{ scalr.variables.AppInstance }}{{ scalr.variables.Function }}001.{{ scalr.variables.Domain }}
+cluster_formation.classic_config.nodes.2 = rabbit@{{ scalr.variables.Geocode }}{{ scalr.variables.Application }}{{ scalr.variables.AppInstance }}{{ scalr.variables.Function }}002.{{ scalr.variables.Domain }}
+cluster_formation.classic_config.nodes.3 = rabbit@{{ scalr.variables.Geocode }}{{ scalr.variables.Application }}{{ scalr.variables.AppInstance }}{{ scalr.variables.Function }}003.{{ scalr.variables.Domain }}
+
+## Preload schema definitions from the following JSON file.
+## Related doc guide: https://rabbitmq.com/management.html#load-definitions.
+##
+management.load_definitions = C:/ServiceBus/rabbitmq_definitions.json
+
+listeners.ssl.default = 5671
+
+# listeners.tcp = none
+
+ssl_options.cacertfile = C:/Certs/cert_chain.pem
+ssl_options.certfile = C:/Certs/cert.pem
+ssl_options.keyfile = C:/Certs/cert.key
+ssl_options.verify = verify_peer
+ssl_options.fail_if_no_peer_cert = false
+ssl_options.depth  = 2
+ssl_options.versions.1 = tlsv1.2
+
+management.ssl.port       = 15671
+management.ssl.cacertfile = C:/Certs/cert_chain.pem
+management.ssl.certfile   = C:/Certs/cert.pem
+management.ssl.keyfile    = C:/Certs/cert.key
+management.ssl.versions.1 = tlsv1.2

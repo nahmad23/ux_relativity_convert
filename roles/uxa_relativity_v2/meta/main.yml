@@ -1,0 +1,32 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/meta/main.yml
+# Converted from metadata.rb.
+# =============================================================================
+galaxy_info:
+  role_name: uxa_relativity_v2
+  author: Jonathan Kast
+  description: Installs/Configures uxa_relativity_v2 (Relativity post-build)
+  company: UnitedLex
+  license: All Rights Reserved
+  min_ansible_version: '2.14'
+  platforms:
+    - name: Windows
+      versions:
+        - '2016'
+        - '2019'
+  galaxy_tags:
+    - windows
+    - relativity
+
+# Chef metadata.rb `depends` list. These were external cookbooks. The functional
+# equivalents are handled as follows:
+#   uxs_7zip             -> win_package (tasks/relativity_base.yml)
+#   uxs_notepadplusplus  -> win_package (tasks/relativity_base.yml)
+#   uxs_notes            -> win_package (tasks/relativity_worker.yml)
+#   uxs_splunk           -> external; port separately if required
+#   audit                -> tasks/audit.yml (community/inspec)
+#   iis                  -> ansible.windows.win_feature (tasks/relativity_web.yml)
+#   line                 -> community.windows.win_lineinfile
+#   uxo_service_password -> tasks/service_password.yml (placeholder)
+dependencies: []

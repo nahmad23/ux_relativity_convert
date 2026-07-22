@@ -1,0 +1,139 @@
+#############     STOP     #################
+#
+# This upgrade will FAIL if pre-upgrade steps are not done:
+#    1. Permissions verified,
+#    2. C++ redistributables installed,
+#    3. UNC paths reviewed,
+#    4. Disk space reviewed.
+#
+#  Details below:
+# 	1. Ensure permissions are correct.
+#		a. Navigate to the install directory and add Full Control permissions to both the Administrators and the Users group
+#		b. Navigate to the data directory and add Full Control permissions to both the Administrators and the Users
+#   		group if the installation uses SDD
+# 	2. Microsoft Visual C++ Redistributables 2010/2012/2013/2015 (x86 and x64) must be installed.
+#	3. If using single data directory, ensure that a mapped drive is used during the upgrade and not UNC. This can be
+#   	reverted after upgrade if desired.
+#		a. Map the UNC path to a letter drive
+#		b. Ensure mapped drive is set as single data directory in <installDir>/etc/single-data-dir.properties
+# 	4. Ensure that there is enough empty space on the data drive for the postgres data to double during upgrade.
+
+# The directory where CAAT is to be installed.
+# This option is mandatory.
+# NOTE! Leading and trailing whitespaces are ignored.
+# NOTE! Only a forward slash '/' or a double back slash '\\' should be used as a path separator!
+caat.install-dir=C:/CAAT
+#
+# The HTTP port used for requests to CAAT. If not specified this will default to '8080' for new installs.
+# NOTE! Leading and trailing whitespaces are ignored.
+# NOTE! Applies to new installation only.
+caat.http-port=8080
+#
+# This option is used to determine whether CAAT should be installed as a Windows Service or not.
+# NOTE! This option is required if you are installing as an Administrator on a Windows Server host,
+# and is prohibited if you are installing as a non-Administrator.
+# The option may be blank, totally absent or equal to true or false.
+# Defaults to false.
+# NOTE! Leading and trailing whitespaces are ignored.
+# NOTE! Applies to new installation only.
+caat.as-windows-service=true
+#
+# This option is used as a service name while installing CAAT as a Windows Service (caat.as-windows-service=true).
+# Defaults to 'Relativity Analytics Engine'.
+# NOTE! Leading and trailing whitespaces are ignored.
+# NOTE! Applies to new installation only.
+caat.windows-service-name=Relativity Analytics Engine
+#
+# Specify the single directory location for storing all user data held in CAAT, with the directory to use.
+# Defaults to ${caat.install-dir}/data-directory if leave it empty.
+# NOTE! Leading and trailing whitespaces are ignored.
+# NOTE! Only a forward slash '/' or a double back slash '\\' should be used as a path separator!
+# NOTE! If the single data directory is defined as a UNC path to a NAS-type device,
+#   a trailing backslash must be present at the end of the UNC path. If CAAT will not start, and asserts that the
+#   specified single data directory does not exist, it is probably because a trailing backslash is not included at
+#   the end of the UNC path or there is a configuration or permissions error in the setup (or both).
+# NOTE! Applies to new installation only.
+caat.single-data-dir={{ scalr.variables.AnalyticsData_DriveLetter }}:/
+#
+# JVM minimum heap size option (-Xms) in megabytes, e.g. 4096.
+# Requirements: must be greater than 0 and less than 'caat.max-heap-size'.
+# For 32-bit JVM the upper bound is 2048, for 64-bit - total physical memory of the machine running installer.
+# This option is applied only if both 'caat.min-heap-size' and 'caat.max-heap-size' are set.
+# Defaults to 1/8 of total physical memory installed on the machine.
+# NOTE! Leading and trailing whitespaces are ignored.
+# NOTE! The value within [32768; 48128] will be replaced with 31744 due to JVM heap limitation.
+# NOTE! Applies to new installation only.
+caat.min-heap-size={{ javaheap_min }}
+#
+# JVM maximum heap size option (-Xmx) in megabytes, e.g 4096.
+# Requirements: must be greater than 0.
+# For 32-bit JVM the upper bound is 2048, for 64-bit - total physical memory of the machine running installer.
+# This option is applied only if both 'caat.min-heap-size' and 'caat.max-heap-size' are set.
+# Defaults to 1/2 of total physical memory installed on the machine.
+# NOTE! Leading and trailing whitespaces are ignored.
+# NOTE! The value within [32768; 48128] will be replaced with 31744 due to JVM heap limitation.
+# NOTE! Applies to new installation only.
+caat.max-heap-size={{ javaheap_max }}
+#
+# Flag that enables or disables HTTP authentication for CAAT instance.
+# Defaults to true if empty.
+# NOTE! Applies to new installation only.
+caat.http-authentication-status=true
+#
+# Password for HTTP authentication.
+# Note! This option is required if HTTP authentication is enabled.
+# NOTE! Applies to new installation only.
+caat.http-password=
+#
+# User name for HTTP authentication.
+# Note! This option is required if HTTP authentication is enabled.
+# NOTE! Applies to new installation only.
+caat.http-user={{ scalr.variables.Service_User }}
+
+# Flag that enables or disables SSL for CAAT instance.
+# The option may be blank, totally absent or equal to true or false.
+# Defaults to true if empty.
+# NOTE! Applies to new installation only.
+caat.ssl-status=true
+
+# Path for PKCS12 certificate-key file.
+# Should point to the existing and valid PKCS12 file.
+# This option is required if caat.ssl-status = true
+# NOTE! Only a forward slash '/' or a double back slash '\\' should be used as a path separator!
+# NOTE! Applies to new installation only.
+caat.ssl-certificate-key-path=
+
+# SSL password
+# This option is required if caat.ssl-status = true
+# Password validation: should be non-empty
+# NOTE! Applies to new installation only.
+caat.ssl-password=
+
+# Flag that to allows PostgreSQL data upgrades. Installer stops installation when
+# this value is false and PostgreSQL needs a data upgrade. Please take all
+# precautions for PostgreSQL data upgrades when this occurs. Defaults to false.
+# NOTE! Applies to upgrade installation only.
+caat.allow-postgres-data-upgrade=false
+
+# Flag that enables or disables in place upgrades for PostgreSQL data upgrades.
+# Defaults to false when not set.
+# WARNING! Take a full backup of CAAT and associated data before upgrading with this value set to true.
+# Note! This setting only applies when CAAT is performing a major version PostgreSQL upgrade.
+# Note! With either option, the old PostgreSQL data directory can be deleted after a successful upgrade.
+# When true, the upgrade uses hard links instead of copying data files to a new cluster in order to reduce required
+#   free disk space and speed up the upgrade. This modifies the existing cluster and data loss is possible in error
+#   scenarios. A full backup should be taken of CAAT and associated data before attempting this upgrade with
+#   upgrade-in-place set to true.
+# When false, the upgrade copies all data and upgrades the copied data. This avoids the possibility of data loss in the
+#   event of error, at the cost of requiring free disk space equal to or greater than the current PostgreSQL cluster
+#   size as well as the time of increased disk I/O. False is recommended for most scenarios.
+# If using the bin/upgrade command directly, this can be set with `.\upgrade.cmd -Dcaat.upgradePgInPlace="true"`
+# NOTE! Apply to upgrade installation only.
+caat.pg.upgrade-in-place=false
+
+# Flag that enables or disables the disk space check override when CAAT is performing a major version PostgreSQL upgrade.
+# To disable the disk space check set value to true.
+# Defaults to false.
+# If using the bin/upgrade command directly, this can be set with `.\upgrade.cmd -Dcaat.overrideDiskSpaceCheck="true"`
+# NOTE! Applies to upgrade installation only.
+caat.overrideDiskSpaceCheck=false

@@ -1,0 +1,21 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/_install_guarded_package.yml
+#
+# Helper included in a loop to reproduce Chef's windows_package + not_if guard
+# pattern (used for the Visual C++ redistributables in relativity_base.rb).
+# Expects loop var `pkg` = a dict with: name, source, bits, options, guard.
+# =============================================================================
+
+- name: "Evaluate install guard for {{ pkg.name }}"
+  ansible.windows.win_powershell:
+    script: "if ({{ pkg.guard }}) { $Ansible.Result = $true } else { $Ansible.Result = $false }"
+  register: pkg_guard
+  changed_when: false
+
+- name: "Install {{ pkg.name }}"
+  ansible.windows.win_package:
+    path: "{{ pkg.source }}/{{ pkg.bits }}"
+    arguments: "{{ pkg.options }}"
+    state: present
+  when: not (pkg_guard.result | bool)

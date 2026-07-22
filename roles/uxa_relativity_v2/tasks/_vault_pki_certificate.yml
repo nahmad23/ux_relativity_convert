@@ -1,0 +1,72 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/_vault_pki_certificate.yml
+#
+# Ansible equivalent of the Chef custom resource
+#   resources/rel_vault_pki_certificate.rb
+#
+# Issues a certificate from a HashiCorp Vault PKI engine and writes the cert,
+# chain, fullchain and key files. Idempotency: it only re-issues when the
+# certificate file is missing or expires within `pki_expiring_days`.
+#
+# Expected vars (set by the caller before include):
+#   pki_common_name          - certificate common name (name property)
+#   pki_vault_address        - Vault URL
+#   pki_vault_token          - Vault token
+#   pki_vault_mount          - PKI engine mount (e.g. 'pki_int')
+#   pki_vault_role           - PKI role (e.g. 'unitedlex-global')
+#   pki_options              - dict of issue params (common_name, ip_sans, alt_names, ttl)
+#   pki_cert_path            - output path for the certificate
+#   pki_cert_chain_path      - output path for cert + issuer chain
+#   pki_cert_fullchain_path  - output path for cert + issuer + key
+#   pki_cert_key_path        - output path for the private key
+#   pki_expiring_days        - renew threshold in days (default 5)
+# =============================================================================
+
+- name: "Vault PKI: check existing certificate validity for {{ pki_common_name }}"
+  ansible.windows.win_powershell:
+    script: |
+      $path = "{{ pki_cert_path }}"
+      if (-not (Test-Path $path)) { $Ansible.Result = $false; return }
+      try {
+        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 $path
+      } catch { $Ansible.Result = $false; return }
+      $cnOk = $cert.Subject -match "CN={{ pki_common_name }}"
+      $notExpiring = $cert.NotAfter -gt (Get-Date).AddDays({{ pki_expiring_days | default(5) }})
+      $Ansible.Result = ($cnOk -and $notExpiring)
+  register: pki_cert_valid
+  changed_when: false
+
+- name: "Vault PKI: issue certificate for {{ pki_common_name }}"
+  community.hashi_vault.vault_write:
+    url: "{{ pki_vault_address }}"
+    token: "{{ pki_vault_token }}"
+    path: "{{ pki_vault_mount }}/issue/{{ pki_vault_role }}"
+    data: "{{ pki_options }}"
+  delegate_to: localhost
+  register: pki_issue
+  when: not pki_cert_valid.result | bool
+
+- name: "Vault PKI: write certificate file"
+  ansible.windows.win_copy:
+    content: "{{ pki_issue.data.data.certificate }}"
+    dest: "{{ pki_cert_path }}"
+  when: not pki_cert_valid.result | bool
+
+- name: "Vault PKI: write certificate chain file (cert + ca_chain)"
+  ansible.windows.win_copy:
+    content: "{{ pki_issue.data.data.certificate }}\n{{ pki_issue.data.data.ca_chain | join('\n') }}"
+    dest: "{{ pki_cert_chain_path }}"
+  when: not pki_cert_valid.result | bool
+
+- name: "Vault PKI: write certificate fullchain file (cert + ca_chain + key)"
+  ansible.windows.win_copy:
+    content: "{{ pki_issue.data.data.certificate }}\n{{ pki_issue.data.data.ca_chain | join('\n') }}\n{{ pki_issue.data.data.private_key }}"
+    dest: "{{ pki_cert_fullchain_path }}"
+  when: not pki_cert_valid.result | bool
+
+- name: "Vault PKI: write private key file"
+  ansible.windows.win_copy:
+    content: "{{ pki_issue.data.data.private_key }}"
+    dest: "{{ pki_cert_key_path }}"
+  when: not pki_cert_valid.result | bool

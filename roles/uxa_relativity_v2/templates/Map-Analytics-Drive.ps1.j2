@@ -1,0 +1,10 @@
+$path = "{{ scalr.variables.AnalyticsData_Path }}"
+$DriveLetter = "{{ scalr.variables.AnalyticsData_DriveLetter }}"
+
+if(!(Test-Path -Path ${DriveLetter}:\))
+ {
+    New-PSDrive -Persist -Name $DriveLetter -PSProvider "FileSystem" -Root $path -Scope Global 
+ }
+else {
+    Write-Output "Directory already exists"
+}

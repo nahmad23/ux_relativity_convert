@@ -1,0 +1,30 @@
+###Invariant Response File###
+
+################### FEATURE SELECTION ################################
+### 0 for: Do not install, do not upgrade, or uninstall if currently installed .
+### 1 for: Install or upgrade.
+###
+### E.g. INSTALLPRIMARYDATABASE=1
+###
+### Note: Installing the Primary Database will automatically install and run Procuro.
+### Note: You cannot install Primary Database and Distributed Database at the same time.
+######################################################################
+
+INSTALLQUEUEMANAGER={{ scalr.variables.INSTALLQUEUEMANAGER }}
+INSTALLWORKER={{ scalr.variables.INSTALLWORKER }}
+SQLINSTANCE={{ scalr.variables.SQLINSTANCE }}
+RELATIVITYSQLINSTANCE={{ scalr.variables.RELATIVITYSQLINSTANCE }}
+SERVICEUSERNAME={{ scalr.variables.Domain }}\{{ scalr.variables.Service_User }}
+SERVICEPASSWORD=
+EDDSDBOPASSWORD=
+IDENTITYSERVERURL={{ scalr.variables.IDENTITYSERVERURL }}
+WORKERNETWORKPATH={{ scalr.variables.WORKERNETWORKPATH }}
+QUEUEMANAGERINSTALLPATH=C:\Program Files\kCura Corporation\Invariant\QueueManager\
+MDFDIR={{ scalr.variables.INV_MDFDIR }}
+LDFDIR={{ scalr.variables.INV_LDFDIR }}
+NISTPACKAGEPATH={{ scalr.variables.NISTPACKAGEPATH }}
+DTSEARCHINDEXPATH={{ scalr.variables.DTSEARCHINDEXPATH }}
+DATAFILESNETWORKPATH={{ scalr.variables.DATAFILESNETWORKPATH }}
+WORKERINSTALLPATH=C:\Program Files\kCura Corporation\Invariant\QueueManager\
+DEFAULTFILEREPOSITORY={{ scalr.variables.INV_DEFAULTFILEREPOSITORY }}
+USEWINAUTH=1

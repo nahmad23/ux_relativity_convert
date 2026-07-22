@@ -1,0 +1,18 @@
+---
+# =============================================================================
+# site.yml -- top-level playbook for the uxa_relativity_v2 role.
+#
+# Equivalent of the Chef run_list 'uxa_relativity_v2::default'. The role's
+# tasks/main.yml dispatches to the correct server-function tasks based on
+# scalr.variables.Function (set per host/group in inventory).
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini site.yml
+#   ansible-playbook -i inventory/hosts.ini site.yml --limit rel_agt
+# =============================================================================
+
+- name: Configure Relativity servers (post-build)
+  hosts: relativity
+  gather_facts: true
+  roles:
+    - uxa_relativity_v2

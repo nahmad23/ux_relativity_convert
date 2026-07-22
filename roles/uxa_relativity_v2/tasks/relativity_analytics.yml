@@ -1,0 +1,122 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_analytics.yml
+# Converted from recipes/relativity_analytics.rb (Function ANA)
+# and the Java-heap logic from attributes/relativity_analytics.rb.
+# =============================================================================
+
+# ----- Java heap sizing (was computed in attributes/relativity_analytics.rb) --
+- name: Get total physical memory for Java heap sizing
+  ansible.windows.win_powershell:
+    script: '(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum / 1mb'
+  register: ana_totalmem
+  changed_when: false
+
+- name: Compute Java heap min/max (with JVM 32768-48128 -> 31744 clamp)
+  ansible.builtin.set_fact:
+    javaheap_min: >-
+      {{ 31744 if ((ana_totalmem.output[0] | float * 0.125) | round | int) >= 32768
+         and ((ana_totalmem.output[0] | float * 0.125) | round | int) <= 48128
+         else ((ana_totalmem.output[0] | float * 0.125) | round | int) }}
+    javaheap_max: >-
+      {{ 31744 if ((ana_totalmem.output[0] | float * 0.5) | round | int) >= 32768
+         and ((ana_totalmem.output[0] | float * 0.5) | round | int) <= 48128
+         else ((ana_totalmem.output[0] | float * 0.5) | round | int) }}
+
+# ----- Disk init (local/kitchen only): PageFile + AnalyticsData -----
+- name: Initialise pagefile & analytics-data disks (local/kitchen only)
+  ansible.builtin.include_tasks: _disk_init.yml
+  loop:
+    - { letter: "{{ pagefile.driveletter }}", label: "{{ pagefile.drivelabel }}" }
+    - { letter: "{{ scalr.variables.AnalyticsData_DriveLetter }}", label: "{{ scalr.variables.AnalyticsData_DriveLabel }}" }
+  loop_control:
+    loop_var: disk
+  when: policy_group == 'local'
+
+# ----- Additional pagefile -----
+- name: Check pagefile drive is present
+  ansible.windows.win_stat:
+    path: "{{ pagefile.driveletter }}:\\"
+  register: pagefile_drive
+
+- name: Set additional pagefile
+  community.windows.win_pagefile:
+    drive: "{{ pagefile.driveletter }}"
+    initial_size: "{{ pagefile_add }}"
+    maximum_size: "{{ pagefile_add }}"
+    override: true
+    state: present
+  when: pagefile_drive.stat.exists
+
+# ----- AnalyticsData directory -----
+- name: Check AnalyticsData drive is present
+  ansible.windows.win_stat:
+    path: "{{ scalr.variables.AnalyticsData_DriveLetter }}:\\"
+  register: analyticsdata_drive
+
+- name: Create AnalyticsData directory
+  ansible.windows.win_file:
+    path: "{{ scalr.variables.AnalyticsData_DriveLetter }}:\\{{ scalr.variables.AnalyticsData_DriveLabel }}"
+    state: directory
+  when: analyticsdata_drive.stat.exists
+
+- name: Grant Administrators & Users Full Control on AnalyticsData dir
+  ansible.windows.win_acl:
+    path: "{{ scalr.variables.AnalyticsData_DriveLetter }}:\\{{ scalr.variables.AnalyticsData_DriveLabel }}"
+    user: "{{ item }}"
+    rights: FullControl
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+  loop:
+    - Administrators
+    - Users
+  when: analyticsdata_drive.stat.exists
+
+# ----- CAAT directory -----
+- name: Create CAAT directory
+  ansible.windows.win_file:
+    path: "{{ directory.caat }}"
+    state: directory
+
+- name: Grant Administrators & Users Full Control on CAAT dir
+  ansible.windows.win_acl:
+    path: "{{ directory.caat }}"
+    user: "{{ item }}"
+    rights: FullControl
+    type: allow
+    state: present
+    inherit: ContainerInherit, ObjectInherit
+  loop:
+    - Administrators
+    - Users
+
+# ----- Update Java Heap size in env.cmd (was line cookbook replace_or_add) -----
+- name: Check CAAT env.cmd exists
+  ansible.windows.win_stat:
+    path: "{{ javaheap.config }}"
+  register: javaheap_cfg
+
+- name: Set HEAP_OPTS in CAAT env.cmd
+  community.windows.win_lineinfile:
+    path: "{{ javaheap.config }}"
+    regexp: '^set HEAP_OPTS=.*'
+    line: "set HEAP_OPTS=-Xms{{ javaheap_min }}m -Xmx{{ javaheap_max }}m"
+  when: javaheap_cfg.stat.exists
+
+# ----- Analytics firewall rule -----
+- name: Allow port 8443 inbound
+  community.windows.win_firewall_rule:
+    name: '8443-Inbound'
+    localport: '8443'
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+
+# ---------------------------------------------------------------------------
+# NOTE: CAAT installer copy/extract + Response-CAAT + profile mapping steps
+# were commented out in the source recipe. The templates are provided
+# (Response-CAAT.properties.j2, Map-Analytics-Drive.ps1.j2) for re-enablement.
+# ---------------------------------------------------------------------------

@@ -1,0 +1,62 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/main.yml
+#
+# Converted from recipes/default.rb -- dispatches to the correct set of task
+# files based on scalr.variables.Function, exactly like the Chef `case` block.
+# =============================================================================
+
+- name: Validate that a known Function is set
+  ansible.builtin.assert:
+    that:
+      - scalr.variables.Function in
+        ['AGT','CNV','DTS','ANA','APP','WRK','SST','SQL','WEB','RDC','MSB','ELM','ELD','ELC']
+    fail_msg: "Unknown role in Function: '{{ scalr.variables.Function }}'"   # == Chef::Log.fatal('Unknown role in Function')
+    success_msg: "Function '{{ scalr.variables.Function }}' recognised."
+
+# ----- AGT / CNV / DTS -> base + agent + harden -----
+- name: Base configuration
+  ansible.builtin.include_tasks: relativity_base.yml
+  when: scalr.variables.Function in ['AGT','CNV','DTS','ANA','APP','WRK','SST','SQL','WEB','RDC','MSB','ELM','ELD','ELC']
+
+- name: Agent configuration (AGT/CNV/DTS)
+  ansible.builtin.include_tasks: relativity_agent.yml
+  when: scalr.variables.Function in ['AGT','CNV','DTS']
+
+- name: Analytics configuration (ANA)
+  ansible.builtin.include_tasks: relativity_analytics.yml
+  when: scalr.variables.Function == 'ANA'
+
+- name: Worker configuration (APP/WRK)
+  ansible.builtin.include_tasks: relativity_worker.yml
+  when: scalr.variables.Function in ['APP','WRK']
+
+- name: Secret Store configuration (SST)
+  ansible.builtin.include_tasks: relativity_secretstore.yml
+  when: scalr.variables.Function == 'SST'
+
+- name: SQL configuration (SQL)
+  ansible.builtin.include_tasks: relativity_sql.yml
+  when: scalr.variables.Function == 'SQL'
+
+- name: Web configuration (WEB/RDC)
+  ansible.builtin.include_tasks: relativity_web.yml
+  when: scalr.variables.Function in ['WEB','RDC']
+
+- name: Service Bus configuration (MSB)
+  ansible.builtin.include_tasks: relativity_servicebus.yml
+  when: scalr.variables.Function == 'MSB'
+
+- name: DataGrid configuration (ELM/ELD/ELC)
+  ansible.builtin.include_tasks: relativity_datagrid.yml
+  when: scalr.variables.Function in ['ELM','ELD','ELC']
+
+# ----- Hardening runs on every Function -----
+- name: Security hardening
+  ansible.builtin.include_tasks: relativity_harden.yml
+  when: scalr.variables.Function in ['AGT','CNV','DTS','ANA','APP','WRK','SST','SQL','WEB','RDC','MSB','ELM','ELD','ELC']
+
+# ----- Optional: service password rotation (uxo_service_password::default) -----
+- name: Service password rotation
+  ansible.builtin.include_tasks: service_password.yml
+  when: uxa_relativity_v2.win_passwordrotation | bool

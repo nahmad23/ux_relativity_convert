@@ -1,0 +1,97 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_agent.yml
+# Converted from recipes/relativity_agent.rb (Functions AGT / CNV / DTS).
+# =============================================================================
+
+# ----- Disk init (only in Test Kitchen / policy_group == local) -----
+- name: Initialise pagefile disk (local/kitchen only)
+  ansible.builtin.include_tasks: _disk_init.yml
+  loop:
+    - { letter: "{{ pagefile.driveletter }}", label: "{{ pagefile.drivelabel }}" }
+  loop_control:
+    loop_var: disk
+  when: policy_group == 'local'
+
+# ----- Additional pagefile on the dedicated disk -----
+- name: Check pagefile drive is present
+  ansible.windows.win_stat:
+    path: "{{ pagefile.driveletter }}:\\"
+  register: pagefile_drive
+
+- name: Set additional pagefile
+  community.windows.win_pagefile:
+    drive: "{{ pagefile.driveletter }}"
+    initial_size: "{{ pagefile_add }}"
+    maximum_size: "{{ pagefile_add }}"
+    override: true
+    state: present
+  when: pagefile_drive.stat.exists
+
+# ----- Install Windows Features -----
+- name: Install agent Windows features
+  ansible.windows.win_feature:
+    name: "{{ agent.features }}"
+    state: present
+
+# ----- Agent firewall rules -----
+- name: Allow agent inbound TCP ports
+  community.windows.win_firewall_rule:
+    name: "{{ item }}-Inbound"
+    localport: "{{ item }}"
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  loop:
+    - '135'
+    - '8095'
+    - '8990'
+    - '8995'
+    - '10001-10030'
+    - '49152-65535'
+
+# ----- Per-function extra ports -----
+- name: Allow port 22 inbound (AGT only)
+  community.windows.win_firewall_rule:
+    name: '22-Inbound'
+    localport: '22'
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  when: scalr.variables.Function == 'AGT'
+
+- name: Allow port 6870 inbound (DTS only)
+  community.windows.win_firewall_rule:
+    name: '6870-Inbound'
+    localport: '6870'
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  when: scalr.variables.Function == 'DTS'
+
+# ---------------------------------------------------------------------------
+# NOTE: The Relativity installer copy/extract + response-file steps for
+# AGT/CNV/DTS were commented out in the source recipe (relativity_agent.rb).
+# The Jinja2 response templates are provided under templates/Response-*.txt.j2
+# so they can be re-enabled when the installers are wired up. Example (AGT):
+#
+# - name: Download Relativity installer zip
+#   ansible.windows.win_get_url:
+#     url: "{{ software.relativity.installer.source }}/{{ software.relativity.installer.zip }}"
+#     dest: "{{ software.relativity.installer.destination }}\\{{ software.relativity.installer.zip }}"
+# - name: Extract Relativity Agent installer
+#   community.windows.win_unzip:
+#     src: "{{ software.relativity.installer.destination }}\\{{ software.relativity.installer.zip }}"
+#     dest: "{{ software.agent.installer.destination }}"
+# - name: Render Agent response file
+#   ansible.windows.win_template:
+#     src: "{{ software.agent.response.template }}"
+#     dest: "{{ software.agent.installer.destination }}\\{{ software.relativity.response.file }}"
+#     force: false
+# ---------------------------------------------------------------------------

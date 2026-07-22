@@ -1,0 +1,76 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/relativity_web.yml
+# Converted from recipes/relativity_web.rb (Functions WEB / RDC)
+# =============================================================================
+
+# ----- Disk init (local/kitchen only) -----
+- name: Initialise pagefile disk (local/kitchen only)
+  ansible.builtin.include_tasks: _disk_init.yml
+  loop:
+    - { letter: "{{ pagefile.driveletter }}", label: "{{ pagefile.drivelabel }}" }
+  loop_control:
+    loop_var: disk
+  when: policy_group == 'local'
+
+# ----- Additional pagefile -----
+- name: Check pagefile drive is present
+  ansible.windows.win_stat:
+    path: "{{ pagefile.driveletter }}:\\"
+  register: pagefile_drive
+
+- name: Set additional pagefile
+  community.windows.win_pagefile:
+    drive: "{{ pagefile.driveletter }}"
+    initial_size: "{{ pagefile_add }}"
+    maximum_size: "{{ pagefile_add }}"
+    override: true
+    state: present
+  when: pagefile_drive.stat.exists
+
+# ----- Legacy Unhandled Exception Policy -----
+- name: Check current Aspnet.config exception policy
+  ansible.windows.win_powershell:
+    script: >-
+      if ((Select-String -Path 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Aspnet.config'
+      -Pattern 'legacyUnhandledExceptionPolicy enabled="true"') -eq $null)
+      { $Ansible.Result = $false } else { $Ansible.Result = $true }
+  register: aspnet_policy
+  changed_when: false
+
+- name: Apply Legacy Unhandled Exception Policy (if not already true)
+  ansible.windows.win_shell: >-
+    ((Get-Content -path "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Aspnet.config" -Raw)
+    -replace 'legacyUnhandledExceptionPolicy enabled="false"', 'legacyUnhandledExceptionPolicy enabled="true"')
+    | Set-Content -Path "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Aspnet.config" -Force
+  when: not aspnet_policy.result | bool
+
+# ----- IIS Roles and Features -----
+- name: Install IIS roles and features
+  ansible.windows.win_feature:
+    name: "{{ web.features }}"
+    state: present
+
+# ----- Web firewall rules -----
+- name: Allow web inbound TCP ports
+  community.windows.win_firewall_rule:
+    name: "{{ item }}-Inbound"
+    localport: "{{ item }}"
+    protocol: tcp
+    direction: in
+    action: allow
+    enabled: true
+    state: present
+  loop:
+    - '443'
+    - '8095'
+    - '8990'
+    - '8995'
+    - '10001-10030'
+
+# ---------------------------------------------------------------------------
+# NOTE: The Web certificate copy, Relativity Web installer copy/extract +
+# Response-Web steps, and the RDC installer + Response-RDC steps were all
+# commented out in the source recipe. Templates Response-Web.txt.j2 and
+# Response-RDC.txt.j2 are provided for re-enablement.
+# ---------------------------------------------------------------------------

@@ -1,0 +1,40 @@
+---
+# =============================================================================
+# roles/uxa_relativity_v2/tasks/_disk_init.yml
+#
+# Helper reproducing the Rescan / Initialize / Format disk PowerShell blocks
+# that appear (identically) in the agent, analytics, worker, web, sql and
+# datagrid recipes for `node['policy_group'] == 'local'`.
+# Expects loop var `disk` = a dict with: letter, label.
+# =============================================================================
+
+- name: "Rescan for new disks ({{ disk.label }})"
+  ansible.windows.win_shell: |
+    $drive = "{{ disk.label }}"
+    if ((Get-Volume | Where-Object FileSystemLabel -eq $drive) -eq $null) {
+      Update-HostStorageCache
+    } else {
+      Write-Output "$drive already exists"
+    }
+  changed_when: false
+
+- name: "Check whether volume {{ disk.label }} already exists"
+  ansible.windows.win_powershell:
+    script: >-
+      if ((Get-Volume | Where-Object FileSystemLabel -eq "{{ disk.label }}") -eq $null)
+      { $Ansible.Result = $false } else { $Ansible.Result = $true }
+  register: disk_volume_present
+  changed_when: false
+
+- name: "Initialize disk and create partition ({{ disk.letter }}:)"
+  ansible.windows.win_shell: |
+    $disk = Get-Disk | Where-Object PartitionStyle -Eq "RAW"
+    $disk = $disk[0]
+    Initialize-Disk -Number $disk.Number -PassThru | New-Partition -DriveLetter "{{ disk.letter }}" -UseMaximumSize
+  when: not disk_volume_present.result | bool
+
+- name: "Format volume {{ disk.label }} ({{ disk.letter }}:)"
+  ansible.windows.win_shell: >-
+    Format-Volume -DriveLetter "{{ disk.letter }}"
+    -NewFileSystemLabel "{{ disk.label }}" -FileSystem NTFS -Confirm:$false
+  when: not disk_volume_present.result | bool
