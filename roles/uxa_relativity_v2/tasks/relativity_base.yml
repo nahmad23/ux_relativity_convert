@@ -114,12 +114,19 @@
 # ---------------------------------------------------------------------------
 # Base Optimization
 # ---------------------------------------------------------------------------
-- name: Set Active Power Scheme
-  ansible.windows.win_regedit:
-    path: "{{ registry.powerscheme.keypath }}"
-    name: "{{ registry.powerscheme.value }}"
-    data: "{{ registry.powerscheme.data }}"
-    type: string
+# The ActivePowerScheme value under HKLM\...\Power\User\PowerSchemes is
+# ACL-protected (writable only by SYSTEM/TrustedInstaller), so a direct
+# win_regedit write fails with "Requested registry access is not allowed" when
+# run as an interactive admin over WinRM. powercfg is the supported, ACL-safe
+# way to activate a scheme. The data GUID is the built-in High Performance plan.
+- name: Get active power scheme
+  ansible.windows.win_shell: powercfg /getactivescheme
+  register: active_power_scheme
+  changed_when: false
+
+- name: Set Active Power Scheme (High Performance)
+  ansible.windows.win_shell: "powercfg /setactive {{ registry.powerscheme.data }}"
+  when: registry.powerscheme.data not in active_power_scheme.stdout
 
 - name: Set Visual Effects (service user hive)
   ansible.windows.win_regedit:
