@@ -123,10 +123,11 @@
   ansible.windows.win_shell: powercfg /getactivescheme
   register: active_power_scheme
   changed_when: false
+  check_mode: false   # read-only query -- run even in --check so the guard below has data
 
 - name: Set Active Power Scheme (High Performance)
   ansible.windows.win_shell: "powercfg /setactive {{ registry.powerscheme.data }}"
-  when: registry.powerscheme.data not in active_power_scheme.stdout
+  when: registry.powerscheme.data not in (active_power_scheme.stdout | default(''))
 
 - name: Set Visual Effects (service user hive)
   ansible.windows.win_regedit:
