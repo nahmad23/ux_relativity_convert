@@ -6,22 +6,33 @@
 # =============================================================================
 
 # ----- Java heap sizing (was computed in attributes/relativity_analytics.rb) --
-- name: Get total physical memory for Java heap sizing
+# Uses total physical memory (MB). Prefer the gathered fact; fall back to the
+# value computed in relativity_base.yml, then to a WMI query.
+- name: Get total physical memory for Java heap sizing (fallback)
   ansible.windows.win_powershell:
-    script: '(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum / 1mb'
+    script: |
+      $sum = (Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum
+      if (-not $sum) { $sum = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory }
+      $Ansible.Result = [int][math]::Round($sum / 1MB)
   register: ana_totalmem
   changed_when: false
+
+- name: Determine total memory (MB) for heap sizing
+  ansible.builtin.set_fact:
+    ana_total_mem_mb: >-
+      {{ (ansible_memtotal_mb | int) if (ansible_memtotal_mb | default(0) | int) > 0
+         else (rel_total_mem_mb | default(ana_totalmem.result) | int) }}
 
 - name: Compute Java heap min/max (with JVM 32768-48128 -> 31744 clamp)
   ansible.builtin.set_fact:
     javaheap_min: >-
-      {{ 31744 if ((ana_totalmem.output[0] | float * 0.125) | round | int) >= 32768
-         and ((ana_totalmem.output[0] | float * 0.125) | round | int) <= 48128
-         else ((ana_totalmem.output[0] | float * 0.125) | round | int) }}
+      {{ 31744 if ((ana_total_mem_mb | int * 0.125) | round | int) >= 32768
+         and ((ana_total_mem_mb | int * 0.125) | round | int) <= 48128
+         else ((ana_total_mem_mb | int * 0.125) | round | int) }}
     javaheap_max: >-
-      {{ 31744 if ((ana_totalmem.output[0] | float * 0.5) | round | int) >= 32768
-         and ((ana_totalmem.output[0] | float * 0.5) | round | int) <= 48128
-         else ((ana_totalmem.output[0] | float * 0.5) | round | int) }}
+      {{ 31744 if ((ana_total_mem_mb | int * 0.5) | round | int) >= 32768
+         and ((ana_total_mem_mb | int * 0.5) | round | int) <= 48128
+         else ((ana_total_mem_mb | int * 0.5) | round | int) }}
 
 # ----- Disk init (local/kitchen only): PageFile + AnalyticsData -----
 - name: Initialise pagefile & analytics-data disks (local/kitchen only)

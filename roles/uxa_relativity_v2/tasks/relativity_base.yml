@@ -9,16 +9,30 @@
 # Runtime facts that were computed in attributes/relativity_base.rb via
 # powershell_out! at compile time. Ansible resolves them here at run time.
 # ---------------------------------------------------------------------------
-- name: Get total physical memory (MB)
+# Total physical memory (MB). Prefer the gathered fact (ansible_memtotal_mb);
+# fall back to a WMI/CIM query for hosts where the fact is missing. Some VMs do
+# not populate Win32_PhysicalMemory, so also fall back to TotalPhysicalMemory.
+- name: Get total physical memory (MB) via WMI (fallback)
   ansible.windows.win_powershell:
-    script: '(Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property capacity -Sum).sum / 1mb'
+    script: |
+      $sum = (Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum).Sum
+      if (-not $sum) { $sum = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory }
+      $Ansible.Result = [int][math]::Round($sum / 1MB)
   register: rel_totalmem
+  changed_when: false
+
+- name: Set total memory fact (MB)
+  ansible.builtin.set_fact:
+    rel_total_mem_mb: >-
+      {{ (ansible_memtotal_mb | int) if (ansible_memtotal_mb | default(0) | int) > 0
+         else (rel_totalmem.result | default(0) | int) }}
 
 - name: Resolve service-user profile SID
   ansible.windows.win_powershell:
-    script: >-
-      (Get-WmiObject win32_userprofile |
-       Where-Object { $_.LocalPath -match "{{ scalr.variables.Service_User }}" }).SID
+    script: |
+      $sids = @(Get-CimInstance Win32_UserProfile |
+                Where-Object { $_.LocalPath -match "{{ scalr.variables.Service_User }}" }).SID
+      $Ansible.Result = if ($sids -and $sids.Count -gt 0) { [string]$sids[0] } else { "" }
   register: rel_serviceuser_sid
   changed_when: false
 
@@ -26,8 +40,8 @@
   ansible.builtin.set_fact:
     pagefile_os: "{{ pagefile.os }}"
     # max = totalmem * 1.5  (rounded to int)
-    pagefile_max: "{{ (rel_totalmem.output[0] | float * 1.5) | round | int }}"
-    serviceuser_sid: "{{ rel_serviceuser_sid.output[0] | default('') }}"
+    pagefile_max: "{{ (rel_total_mem_mb | int * 1.5) | round | int }}"
+    serviceuser_sid: "{{ rel_serviceuser_sid.result | default('') }}"
 
 - name: Compute additional pagefile size (cap at 51200)
   ansible.builtin.set_fact:
