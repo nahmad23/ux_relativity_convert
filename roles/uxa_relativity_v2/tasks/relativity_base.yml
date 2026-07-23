@@ -110,6 +110,10 @@
     - "{{ directory.tempfolder }}"
     - "{{ directory.certs }}"
     - "{{ directory.scripts }}"
+  # Later download/extract tasks depend on these dirs existing. win_file only
+  # simulates in --check mode, which breaks those downloads, so create the
+  # directories for real even during a dry run (creating a folder is harmless).
+  check_mode: false
 
 # ---------------------------------------------------------------------------
 # Base Optimization
