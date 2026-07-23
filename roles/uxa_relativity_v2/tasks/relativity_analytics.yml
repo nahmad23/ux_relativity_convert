@@ -20,7 +20,7 @@
 - name: Determine total memory (MB) for heap sizing
   ansible.builtin.set_fact:
     ana_total_mem_mb: >-
-      {{ (ansible_memtotal_mb | int) if (ansible_memtotal_mb | default(0) | int) > 0
+      {{ (ansible_facts.memtotal_mb | int) if (ansible_facts.memtotal_mb | default(0) | int) > 0
          else (rel_total_mem_mb | default(ana_totalmem.result) | int) }}
 
 - name: Compute Java heap min/max (with JVM 32768-48128 -> 31744 clamp)

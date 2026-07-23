@@ -277,6 +277,15 @@ uxa_relativity_v2:
   # windows_server_version is derived at runtime (see tasks/audit.yml)
 
 # -----------------------------------------------------------------------------
+# Toggle for the external-dependency-cookbook package stand-ins
+# (uxs_7zip, uxs_notepadplusplus, uxs_notes). These are NOT part of this
+# cookbook and the example URLs are placeholders, so they are OFF by default.
+# Set to true (and point the paths at your real installer sources) to install
+# them, or leave false and handle those packages via their own playbooks/roles.
+# -----------------------------------------------------------------------------
+install_dependency_packages: false
+
+# -----------------------------------------------------------------------------
 # from attributes/relativity_base.rb  -- Pagefile Attributes
 # -----------------------------------------------------------------------------
 pagefile:

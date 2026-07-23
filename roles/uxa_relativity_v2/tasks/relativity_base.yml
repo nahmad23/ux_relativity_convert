@@ -24,7 +24,7 @@
 - name: Set total memory fact (MB)
   ansible.builtin.set_fact:
     rel_total_mem_mb: >-
-      {{ (ansible_memtotal_mb | int) if (ansible_memtotal_mb | default(0) | int) > 0
+      {{ (ansible_facts.memtotal_mb | int) if (ansible_facts.memtotal_mb | default(0) | int) > 0
          else (rel_totalmem.result | default(0) | int) }}
 
 - name: Resolve service-user profile SID
@@ -62,14 +62,16 @@
     path: "{{ software.basesource }}/7zip/7z-x64.msi"
     state: present
     arguments: /qn /norestart
-  ignore_errors: true   # dependency cookbook -- adjust to your package source
+  when: install_dependency_packages | bool   # off by default; set real source first
+  ignore_errors: true
 
 - name: Install Notepad++ (was uxs_notepadplusplus::default)
   ansible.windows.win_package:
     path: "{{ software.basesource }}/notepadplusplus/npp-installer.x64.exe"
     state: present
     arguments: /S
-  ignore_errors: true   # dependency cookbook -- adjust to your package source
+  when: install_dependency_packages | bool   # off by default; set real source first
+  ignore_errors: true
 
 # ---------------------------------------------------------------------------
 # Import Carbon PowerShell module
@@ -90,7 +92,9 @@
     src: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon.zip'
     dest: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon'
     creates: 'C:\Windows\System32\WindowsPowerShell\v1.0\Modules\Carbon'
-  when: not carbon_dir.stat.exists
+  # In --check mode the download above is simulated (no file on disk), so skip
+  # the extract to avoid a false "file does not exist" failure.
+  when: not carbon_dir.stat.exists and not ansible_check_mode
 
 # ---------------------------------------------------------------------------
 # Create Base Directories

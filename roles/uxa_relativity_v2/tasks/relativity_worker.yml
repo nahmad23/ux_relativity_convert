@@ -10,7 +10,8 @@
     path: "{{ software.basesource }}/notes/notes-installer.exe"
     state: present
     arguments: /S
-  ignore_errors: true   # dependency cookbook -- adjust to your package source
+  when: install_dependency_packages | bool   # off by default; set real source first
+  ignore_errors: true
 
 # ----- Disk init (local/kitchen only) -----
 - name: Initialise pagefile disk (local/kitchen only)

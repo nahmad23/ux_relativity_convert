@@ -1,0 +1,17 @@
+---
+# =============================================================================
+# group_vars/rel_ana.yml -- overrides for the Analytics server group.
+# Merges over group_vars/all.yml. Values mirror the kitchen.yml `rel-ana` suite.
+# =============================================================================
+
+policy_group: 'prod'
+
+scalr:
+  variables:
+    Function: 'ANA'
+    SCALR_FARM_ROLE_ALIAS: 'Analytics-Server'
+    Domain: 'test-ana'
+    CAAT_Version: '4.6.7'
+    AnalyticsData_DriveLetter: 'F'
+    AnalyticsData_DriveLabel: 'AnalyticsData'
+    AnalyticsData_Path: 'C:\Temp'
