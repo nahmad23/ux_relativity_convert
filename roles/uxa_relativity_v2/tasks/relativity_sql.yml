@@ -32,7 +32,7 @@
 
 - name: Enable Named Pipes protocol
   ansible.windows.win_regedit:
-    path: 'HKLM\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQLServer\SuperSocketNetLib\Np'
+    path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL15.MSSQLSERVER\MSSQLServer\SuperSocketNetLib\Np'
     name: 'Enabled'
     data: 1
     type: dword

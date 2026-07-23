@@ -7,7 +7,7 @@
 # 2.3.11.7 LAN Manager authentication level -> NTLMv2 only, refuse LM & NTLM
 - name: Set LmCompatibilityLevel to 5
   ansible.windows.win_regedit:
-    path: 'HKLM\SYSTEM\CurrentControlSet\Control\Lsa'
+    path: 'HKLM:\SYSTEM\CurrentControlSet\Control\Lsa'
     name: 'LmCompatibilityLevel'
     data: 5
     type: dword
@@ -16,7 +16,7 @@
 # SSL2/SSL3/TLS1.0/TLS1.1 -> disabled ; TLS1.2 -> enabled
 - name: Configure SCHANNEL protocol Enabled values
   ansible.windows.win_regedit:
-    path: "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\{{ item.0.proto }}\\{{ item.1 }}"
+    path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\{{ item.0.proto }}\\{{ item.1 }}"
     name: 'Enabled'
     data: "{{ item.0.enabled }}"
     type: dword
@@ -26,7 +26,7 @@
 
 - name: Configure SCHANNEL protocol DisabledByDefault values
   ansible.windows.win_regedit:
-    path: "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\{{ item.0.proto }}\\{{ item.1 }}"
+    path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\{{ item.0.proto }}\\{{ item.1 }}"
     name: 'DisabledByDefault'
     data: "{{ item.0.disabledbydefault }}"
     type: dword
@@ -37,7 +37,7 @@
 # 7.7-7.11 + extras: SCHANNEL cipher enable/disable
 - name: Configure SCHANNEL cipher suites
   ansible.windows.win_regedit:
-    path: "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Ciphers\\{{ item.name }}"
+    path: "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Ciphers\\{{ item.name }}"
     name: 'Enabled'
     data: "{{ item.enabled }}"
     type: dword
@@ -48,7 +48,7 @@
 # Disable TLS/SSL support for static key cipher suites (PKCS key exchange)
 - name: Disable PKCS key exchange algorithm
   ansible.windows.win_regedit:
-    path: 'HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\KeyExchangeAlgorithms\PKCS'
+    path: 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\KeyExchangeAlgorithms\PKCS'
     name: 'Enabled'
     data: 0
     type: dword
@@ -56,14 +56,14 @@
 # 18.9.80.1.1 SmartScreen -> Warn
 - name: Enable Windows Defender SmartScreen
   ansible.windows.win_regedit:
-    path: 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System'
+    path: 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System'
     name: 'EnableSmartScreen'
     data: 1
     type: dword
 
 - name: Set SmartScreen level to Warn
   ansible.windows.win_regedit:
-    path: 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System'
+    path: 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System'
     name: 'ShellSmartScreenLevel'
     data: 'Warn'
     type: string
@@ -72,21 +72,21 @@
 # consent_behavior_admins :no_prompt)
 - name: Disable UAC (EnableLUA = 0)
   ansible.windows.win_regedit:
-    path: 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+    path: 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
     name: 'EnableLUA'
     data: 0
     type: dword
 
 - name: Set PromptOnSecureDesktop = 1
   ansible.windows.win_regedit:
-    path: 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+    path: 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
     name: 'PromptOnSecureDesktop'
     data: 1
     type: dword
 
 - name: Set ConsentPromptBehaviorAdmin = 0 (no prompt)
   ansible.windows.win_regedit:
-    path: 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+    path: 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
     name: 'ConsentPromptBehaviorAdmin'
     data: 0
     type: dword
@@ -94,6 +94,6 @@
 # Delete 2.3.11.4 control (Kerberos supported encryption types key)
 - name: Delete Kerberos policy key
   ansible.windows.win_regedit:
-    path: 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos'
+    path: 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Kerberos'
     state: absent
     delete_key: true

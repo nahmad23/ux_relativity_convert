@@ -301,7 +301,7 @@ pagefile:
 # NOTE: relativity.serviceuser.sid is resolved at runtime (tasks/relativity_base.yml)
 registry:
   powerscheme:
-    keypath: 'HKLM\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes'
+    keypath: 'HKLM:\SYSTEM\CurrentControlSet\Control\Power\User\PowerSchemes'
     value: 'ActivePowerScheme'
     data: '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
   visualeffects:
@@ -312,11 +312,11 @@ registry:
     value: 'ProxyEnable'
     data: 0
   procsheduling:
-    keypath: 'HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl'
+    keypath: 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl'
     value: 'Win32PrioritySeparation'
     data: 24
   mstdc:
-    keypath: 'HKLM\SOFTWARE\Microsoft\MSDTC\Security'
+    keypath: 'HKLM:\SOFTWARE\Microsoft\MSDTC\Security'
     values:
       - { name: 'NetworkDtcAccess', data: 1 }
       - { name: 'NetworkDtcAccessAdmin', data: 1 }
