@@ -55,9 +55,9 @@ scalr:
     Geocode: 'AUSSC'
     Application: 'REL'
     AppInstance: 2
-    Domain: 'test-agt'          # REQUIRED: change to your AD NetBIOS domain
-    Service_User: 'azure'       # REQUIRED: change to your real service account
-    Service_Password: 'P2ssw0rd!'   # REQUIRED: change + encrypt with ansible-vault
+    Domain: 'ULXREVIEW'         # REQUIRED: your AD NetBIOS domain -- VERIFY this value
+    Service_User: 'CHANGE_ME'   # REQUIRED: the real AD Relativity service account (no domain prefix)
+    Service_Password: 'CHANGE_ME'   # REQUIRED: that account's password -- ENCRYPT with ansible-vault
     Function: 'AGT'
     SCALR_FARM_ROLE_ALIAS: 'Agent-Server-Core'
 
