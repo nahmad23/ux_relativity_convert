@@ -269,7 +269,8 @@
     name: "{{ item.name }}"
     data: "{{ item.data }}"
     type: dword
-  loop: "{{ registry.mstdc.values }}"
+  # Use ['values'] subscript: dotted .values resolves to the dict method, not the key.
+  loop: "{{ registry.mstdc['values'] }}"
   when: scalr.variables.Function != 'SST'
 
 - name: Disable Proxy Settings (service user hive)
