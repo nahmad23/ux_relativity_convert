@@ -10,7 +10,8 @@ scalr:
   variables:
     Function: 'ANA'
     SCALR_FARM_ROLE_ALIAS: 'Analytics-Server'
-    Domain: 'test-ana'
+    Domain: 'test-ana'          # REQUIRED: change to your AD NetBIOS domain (overrides all.yml)
+    # Service_User / Service_Password inherited from all.yml -- set them there.
     CAAT_Version: '4.6.7'
     AnalyticsData_DriveLetter: 'F'
     AnalyticsData_DriveLabel: 'AnalyticsData'

@@ -26,6 +26,24 @@
 #   ELC  -> base + datagrid + harden       (DataGrid client)
 # =============================================================================
 
+# #############################################################################
+# ##  REQUIRED -- SET THESE FOR YOUR ENVIRONMENT BEFORE RUNNING            ##
+# ##  The defaults below are TEST/KITCHEN placeholders and WILL fail on a  ##
+# ##  real host (e.g. domain 'test-ana', account 'azure', mirror URL).     ##
+# #############################################################################
+#
+#   scalr.variables.Domain           -> your AD NetBIOS domain (e.g. 'ULXREVIEW')
+#   scalr.variables.Service_User     -> the real service account (e.g. 'svc_relativity')
+#   scalr.variables.Service_Password -> that account's password (ENCRYPT with ansible-vault)
+#   software.basesource              -> your real software mirror base URL
+#   vault.uxa_relativity_v2.token    -> a real Vault token (MSB/DataGrid only)
+#   ansible_user / ansible_password  -> WinRM credentials (see inventory/hosts.ini)
+#
+# The account "Domain\Service_User" must be resolvable on the target host: the
+# machine must be joined to that domain (or use a local account and set Domain
+# to the machine's own name / '.').
+# #############################################################################
+
 # In Chef this was node['policy_group']; 'local' == Test Kitchen. Set to 'local'
 # to enable the disk-initialisation blocks and test-only behaviour, or 'prod'
 # for real deployments.
@@ -37,9 +55,9 @@ scalr:
     Geocode: 'AUSSC'
     Application: 'REL'
     AppInstance: 2
-    Domain: 'test-agt'
-    Service_User: 'azure'
-    Service_Password: 'P2ssw0rd!'
+    Domain: 'test-agt'          # REQUIRED: change to your AD NetBIOS domain
+    Service_User: 'azure'       # REQUIRED: change to your real service account
+    Service_Password: 'P2ssw0rd!'   # REQUIRED: change + encrypt with ansible-vault
     Function: 'AGT'
     SCALR_FARM_ROLE_ALIAS: 'Agent-Server-Core'
 
